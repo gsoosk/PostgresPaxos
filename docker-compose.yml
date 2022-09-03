@@ -1,0 +1,20 @@
+version: '3.5'
+
+services:
+  leader_postgres:
+    container_name: leader_postgres
+    image: postgres
+    environment:
+      POSTGRES_USER: leader
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+      PGDATA: /data/postgres
+    volumes:
+      - postgres0:/data/postgres
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5430:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres0:
