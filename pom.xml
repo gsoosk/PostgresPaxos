@@ -18,6 +18,12 @@
             <artifactId>postgresql</artifactId>
             <version>42.5.0</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/net.sourceforge.argparse4j/argparse4j -->
+        <dependency>
+            <groupId>net.sourceforge.argparse4j</groupId>
+            <artifactId>argparse4j</artifactId>
+            <version>0.9.0</version>
+        </dependency>
     </dependencies>
 
     <build>

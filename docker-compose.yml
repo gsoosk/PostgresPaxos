@@ -1,11 +1,11 @@
 version: '3.5'
 
 services:
-  leader_postgres:
-    container_name: leader_postgres
+  postgres0_service:
+    container_name: postgres0_service
     image: postgres
     environment:
-      POSTGRES_USER: leader
+      POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: postgres
       PGDATA: /data/postgres
@@ -16,5 +16,37 @@ services:
       - "5430:5432"
     restart: unless-stopped
 
+  postgres1_service:
+    container_name: postgres1_service
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+      PGDATA: /data/postgres
+    volumes:
+      - postgres1:/data/postgres
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5431:5432"
+    restart: unless-stopped
+
+  postgres2_service:
+    container_name: postgres2_service
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+      PGDATA: /data/postgres
+    volumes:
+      - postgres2:/data/postgres
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
 volumes:
   postgres0:
+  postgres1:
+  postgres2:

@@ -1,0 +1,380 @@
+package com.benchmark;
+
+import static net.sourceforge.argparse4j.impl.Arguments.store;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.rmi.Naming;
+import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.Arrays;
+import java.util.logging.FileHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+
+import com.DatastoreInterface;
+import net.sourceforge.argparse4j.ArgumentParsers;
+import net.sourceforge.argparse4j.inf.ArgumentParser;
+import net.sourceforge.argparse4j.inf.ArgumentParserException;
+import net.sourceforge.argparse4j.inf.Namespace;
+import net.sourceforge.argparse4j.inf.MutuallyExclusiveGroup;
+
+
+
+public class Performance {
+
+    public static void main(String[] args) throws Exception {
+        Performance perf = new Performance();
+        perf.start(args);
+    }
+
+    private String address;
+    private int port;
+    DatastoreInterface datastore;
+
+    private static Logger logger = getLogger("logs/performance.log", true);
+
+    //takes in the log-file path and builds a logger object
+    private static Logger getLogger(String logFile, Boolean verbose) {
+        Logger logger = Logger.getLogger("performance_log");
+        FileHandler fh;
+
+        try {
+            // This stops logs from getting displayed on console
+            if (!verbose)
+                logger.setUseParentHandlers(false);
+            // if file does not exist we create a new file
+            File log = new File(logFile);
+            if(!log.exists()) {
+                log.createNewFile();
+            }
+            fh = new FileHandler(logFile,true);
+            logger.addHandler(fh);
+            SimpleFormatter formatter = new SimpleFormatter();
+            fh.setFormatter(formatter);
+
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return logger;
+    }
+
+    void start(String[] args) throws IOException {
+        ArgumentParser parser = argParser();
+
+        try {
+            Namespace res = parser.parseArgs(args);
+
+            /* parse args */
+            address = res.getString("address");
+            port = res.getInt("port");
+            long numRecords = res.getLong("numRecords");
+            Integer recordSize = res.getInt("recordSize");
+            int throughput = res.getInt("throughput");
+            String payloadFilePath = res.getString("payloadFile");
+
+            // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
+            String payloadDelimiter = res.getString("payloadDelimiter").equals("\\n") ? "\n" : res.getString("payloadDelimiter");
+
+
+            List<byte[]> payloadByteList = readPayloadFile(payloadFilePath, payloadDelimiter);
+
+
+            /* setup perf test */
+            byte[] payload = null;
+            if (recordSize != null) {
+                payload = new byte[recordSize];
+            }
+            Random random = new Random(0);
+            Stats stats = new Stats(numRecords, 5000);
+            long startMs = System.currentTimeMillis();
+
+            ThroughputThrottler throttler = new ThroughputThrottler(throughput, startMs);
+
+            connectToDataStore();
+
+            for (long i = 0; i < numRecords; i++) {
+                payload = generateRandomPayload(recordSize, payloadByteList, payload, random);
+
+
+                long sendStartMs = System.currentTimeMillis();
+                String record =  new String(payload, StandardCharsets.UTF_8);
+                datastore.put("test", record);
+                stats.nextCompletion(sendStartMs, payload.length);
+
+                if (throttler.shouldThrottle(i, sendStartMs)) {
+                    throttler.throttle();
+                }
+            }
+
+            // TODO: closing open things?
+            /* print final results */
+            stats.printTotal();
+
+        } catch (ArgumentParserException e) {
+            if (args.length == 0) {
+                parser.printHelp();
+            } else {
+                parser.handleError(e);
+            }
+        }
+
+
+    }
+
+    private void connectToDataStore() throws MalformedURLException, RemoteException {
+        while (true) {
+            try {
+                datastore = (DatastoreInterface) Naming.lookup("//" + address + ":" + port + "/com.Server");
+                break;
+            } catch (NotBoundException e) {
+                System.out.println("Remote connection failed, trying again in 5 seconds");
+                logger.log(Level.SEVERE, "Remote connection failed", e);
+                // wait for 5 seconds before trying to re-establish connection
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e1) {
+                    // TODO Auto-generated catch block
+                    e1.printStackTrace();
+                }
+            }
+        }
+    }
+
+
+    static byte[] generateRandomPayload(Integer recordSize, List<byte[]> payloadByteList, byte[] payload,
+                                        Random random) {
+        if (!payloadByteList.isEmpty()) {
+            payload = payloadByteList.get(random.nextInt(payloadByteList.size()));
+        } else if (recordSize != null) {
+            for (int j = 0; j < payload.length; ++j)
+                payload[j] = (byte) (random.nextInt(26) + 65);
+        } else {
+            throw new IllegalArgumentException("no payload File Path or record Size provided");
+        }
+        return payload;
+    }
+
+
+    static List<byte[]> readPayloadFile(String payloadFilePath, String payloadDelimiter) throws IOException {
+        List<byte[]> payloadByteList = new ArrayList<>();
+        if (payloadFilePath != null) {
+            Path path = Paths.get(payloadFilePath);
+            logger.info("Reading payloads from: " + path.toAbsolutePath());
+            if (Files.notExists(path) || Files.size(path) == 0)  {
+                throw new IllegalArgumentException("File does not exist or empty file provided.");
+            }
+
+            String[] payloadList = new String(Files.readAllBytes(path), StandardCharsets.UTF_8).split(payloadDelimiter);
+
+            logger.info("Number of messages read: " + payloadList.length);
+
+            for (String payload : payloadList) {
+                payloadByteList.add(payload.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        return payloadByteList;
+    }
+
+    /** Get the command-line argument parser. */
+    static ArgumentParser argParser() {
+        ArgumentParser parser = ArgumentParsers
+                .newArgumentParser("producer-performance")
+                .defaultHelp(true)
+                .description("This tool is used to verify the producer performance.");
+
+        MutuallyExclusiveGroup payloadOptions = parser
+                .addMutuallyExclusiveGroup()
+                .required(true)
+                .description("either --record-size or --payload-file must be specified but not both.");
+
+        parser.addArgument("--address")
+                .action(store())
+                .required(true)
+                .type(String.class)
+                .metavar("ADDRESS")
+                .dest("address")
+                .help("leader's address");
+
+        parser.addArgument("--port")
+                .action(store())
+                .required(true)
+                .type(Integer.class)
+                .metavar("PORT")
+                .dest("port")
+                .help("leader's port");
+
+        parser.addArgument("--num-records")
+                .action(store())
+                .required(true)
+                .type(Long.class)
+                .metavar("NUM-RECORDS")
+                .dest("numRecords")
+                .help("number of messages to produce");
+
+        payloadOptions.addArgument("--record-size")
+                .action(store())
+                .required(false)
+                .type(Integer.class)
+                .metavar("RECORD-SIZE")
+                .dest("recordSize")
+                .help("message size in bytes. Note that you must provide exactly one of --record-size or --payload-file.");
+
+        payloadOptions.addArgument("--payload-file")
+                .action(store())
+                .required(false)
+                .type(String.class)
+                .metavar("PAYLOAD-FILE")
+                .dest("payloadFile")
+                .help("file to read the message payloads from. This works only for UTF-8 encoded text files. " +
+                        "Payloads will be read from this file and a payload will be randomly selected when sending messages. " +
+                        "Note that you must provide exactly one of --record-size or --payload-file.");
+
+        parser.addArgument("--payload-delimiter")
+                .action(store())
+                .required(false)
+                .type(String.class)
+                .metavar("PAYLOAD-DELIMITER")
+                .dest("payloadDelimiter")
+                .setDefault("\\n")
+                .help("provides delimiter to be used when --payload-file is provided. " +
+                        "Defaults to new line. " +
+                        "Note that this parameter will be ignored if --payload-file is not provided.");
+
+        parser.addArgument("--throughput")
+                .action(store())
+                .required(true)
+                .type(Integer.class)
+                .metavar("THROUGHPUT")
+                .help("throttle maximum message throughput to *approximately* THROUGHPUT messages/sec. Set this to -1 to disable throttling.");
+
+
+        return parser;
+    }
+
+    private static class Stats {
+        private long start;
+        private long windowStart;
+        private int[] latencies;
+        private int sampling;
+        private int iteration;
+        private int index;
+        private long count;
+        private long bytes;
+        private int maxLatency;
+        private long totalLatency;
+        private long windowCount;
+        private int windowMaxLatency;
+        private long windowTotalLatency;
+        private long windowBytes;
+        private long reportingInterval;
+
+        public Stats(long numRecords, int reportingInterval) {
+            this.start = System.currentTimeMillis();
+            this.windowStart = System.currentTimeMillis();
+            this.iteration = 0;
+            this.sampling = (int) (numRecords / Math.min(numRecords, 500000));
+            this.latencies = new int[(int) (numRecords / this.sampling) + 1];
+            this.index = 0;
+            this.maxLatency = 0;
+            this.totalLatency = 0;
+            this.windowCount = 0;
+            this.windowMaxLatency = 0;
+            this.windowTotalLatency = 0;
+            this.windowBytes = 0;
+            this.totalLatency = 0;
+            this.reportingInterval = reportingInterval;
+        }
+
+        public void record(int iter, int latency, int bytes, long time) {
+            this.count++;
+            this.bytes += bytes;
+            this.totalLatency += latency;
+            this.maxLatency = Math.max(this.maxLatency, latency);
+            this.windowCount++;
+            this.windowBytes += bytes;
+            this.windowTotalLatency += latency;
+            this.windowMaxLatency = Math.max(windowMaxLatency, latency);
+            if (iter % this.sampling == 0) {
+                this.latencies[index] = latency;
+                this.index++;
+            }
+            /* maybe report the recent perf */
+            if (time - windowStart >= reportingInterval) {
+                printWindow();
+                newWindow();
+            }
+        }
+
+        public void nextCompletion(long start, int bytes) {
+            long now = System.currentTimeMillis();
+            int latency = (int) (now - start);
+            record(iteration, latency, bytes, now);
+            this.iteration++;
+
+        }
+
+        public void printWindow() {
+            long elapsed = System.currentTimeMillis() - windowStart;
+            double recsPerSec = 1000.0 * windowCount / (double) elapsed;
+            double mbPerSec = 1000.0 * this.windowBytes / (double) elapsed / (1024.0 * 1024.0);
+            logger.info(String.format("%d records sent, %.1f records/sec (%.2f MB/sec), %.1f ms avg latency, %.1f ms max latency.%n",
+                    windowCount,
+                    recsPerSec,
+                    mbPerSec,
+                    windowTotalLatency / (double) windowCount,
+                    (double) windowMaxLatency));
+        }
+
+        public void newWindow() {
+            this.windowStart = System.currentTimeMillis();
+            this.windowCount = 0;
+            this.windowMaxLatency = 0;
+            this.windowTotalLatency = 0;
+            this.windowBytes = 0;
+        }
+
+        public void printTotal() {
+            long elapsed = System.currentTimeMillis() - start;
+            double recsPerSec = 1000.0 * count / (double) elapsed;
+            double mbPerSec = 1000.0 * this.bytes / (double) elapsed / (1024.0 * 1024.0);
+            int[] percs = percentiles(this.latencies, index, 0.5, 0.95, 0.99, 0.999);
+            logger.info(String.format("%d records sent, %f records/sec (%.2f MB/sec), %.2f ms avg latency, %.2f ms max latency, %d ms 50th, %d ms 95th, %d ms 99th, %d ms 99.9th.%n",
+                    count,
+                    recsPerSec,
+                    mbPerSec,
+                    totalLatency / (double) count,
+                    (double) maxLatency,
+                    percs[0],
+                    percs[1],
+                    percs[2],
+                    percs[3]));
+        }
+
+        private static int[] percentiles(int[] latencies, int count, double... percentiles) {
+            int size = Math.min(count, latencies.length);
+            Arrays.sort(latencies, 0, size);
+            int[] values = new int[percentiles.length];
+            for (int i = 0; i < percentiles.length; i++) {
+                int index = (int) (percentiles[i] * size);
+                values[i] = latencies[index];
+            }
+            return values;
+        }
+    }
+
+
+
+}

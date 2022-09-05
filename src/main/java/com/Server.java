@@ -52,9 +52,8 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		super();
 		this.serverID = serverID;
 		this.registry = registry;
-		this.logger = getLogger("logs/"+serverID+"_server.log");
+		this.logger = getLogger("logs/"+serverID+"_server.log", false);
 		this.port = port;
-		//TODO: change the port!
 		this.storage = new Storage(postgresPort, logger);
 	}
 
@@ -339,11 +338,14 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 
 
 	//takes in the log-file path and builds a logger object
-	public static Logger getLogger(String logFile) {
+	public static Logger getLogger(String logFile, Boolean verbose) {
 		Logger logger = Logger.getLogger("server_log");  
 		FileHandler fh;  
 
-		try {  
+		try {
+			if (!verbose)
+				logger.setUseParentHandlers(false);
+
 			File log = new File(logFile);
 			// if file does not exist we create a new file
 			if(!log.exists()) {

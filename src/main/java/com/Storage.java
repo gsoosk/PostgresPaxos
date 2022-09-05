@@ -7,7 +7,7 @@ import java.util.logging.Logger;
 
 public class Storage {
     private static String url = "";
-    private static final String user = "leader";
+    private static final String user = "user";
     private static final String password = "password";
 
 
