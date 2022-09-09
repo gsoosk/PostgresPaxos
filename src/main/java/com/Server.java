@@ -48,6 +48,11 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 
 	private int maxPaxosRetrys = 3;
 
+	// for multi paxos
+	private boolean electedAsLeaderBefore = false;
+	private long multiPaxosProposalNumber;
+	private List<Promise> previousPromises;
+
 	protected Server(String serverID, Registry registry, int port, String postgresPort) throws RemoteException {
 		super();
 		this.serverID = serverID;
@@ -162,51 +167,53 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 			tryNumber++;
 
 			logger.info("New Paxos round started");
+			long proposalNumber = electedAsLeaderBefore ? multiPaxosProposalNumber : System.currentTimeMillis();
+			List<Promise> promises = electedAsLeaderBefore ? this.previousPromises : new ArrayList<Promise>();
+			if (!electedAsLeaderBefore) {
 
-			long proposalNumber = System.currentTimeMillis();
-			logger.info("New proposal number is "+proposalNumber);
+				logger.info("New proposal number is " + proposalNumber);
 
-			List<Promise> promises = new ArrayList<Promise>();
-			for(String serverID: this.registry.list()) {
-				try {
-					logger.info("Sending prepare to server: "+serverID);
-					DatastoreInterface server = (DatastoreInterface) this.registry.lookup(serverID);
-					Promise promise = server.prepare(proposalNumber);
-					logger.info("Received promise");
-					promise.setServerID(serverID);
-					promises.add(promise);
+				for (String serverID : this.registry.list()) {
+					try {
+						logger.info("Sending prepare to server: " + serverID);
+						DatastoreInterface server = (DatastoreInterface) this.registry.lookup(serverID);
+						Promise promise = server.prepare(proposalNumber);
+						logger.info("Received promise");
+						promise.setServerID(serverID);
+						promises.add(promise);
+					} catch (RemoteException re) {
+						logger.info("Received denial");
+						continue;
+					} catch (NotBoundException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+
 				}
-				catch(RemoteException re) {
-					logger.info("Received denial");
+
+				if (promises.size() <= this.registry.list().length / 2) {
+					try {
+						logger.info("Majority of acceptors didn't promise, restarting paxos run in 2 seconds");
+						TimeUnit.SECONDS.sleep(2);
+					} catch (InterruptedException e) {
+						logger.log(Level.SEVERE, "Interrupted Exception", e);
+					}
 					continue;
-				} catch (NotBoundException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
 				}
 
+				logger.info("Majority of acceptors promised");
 			}
-
-			if( promises.size() <= this.registry.list().length / 2) {
-				try {
-					logger.info("Majority of acceptors didn't promise, restarting paxos run in 2 seconds");
-					TimeUnit.SECONDS.sleep(2);
-				} catch (InterruptedException e) {
-					logger.log(Level.SEVERE, "Interrupted Exception", e);
-				}
-				continue;
-			}
-
-			logger.info("Majority of acceptors promised");
 
 			long max = 0l;
 			Transaction value = transaction;
 
-			for(Promise promise : promises) {
-				if((promise.getPreviousProposalNumber() != 0) && (promise.getPreviousProposalNumber() > max)) {
-					max = promise.getPreviousProposalNumber();
-					value = promise.getPreviousAcceptedValue();
-				}
-			}
+
+//			for(Promise promise : promises) {
+//				if((promise.getPreviousProposalNumber() != 0) && (promise.getPreviousProposalNumber() > max)) {
+//					max = promise.getPreviousProposalNumber();
+//					value = promise.getPreviousAcceptedValue();
+//				}
+//			}
 
 			logger.info("Value for accept: "+value.toString());
 			List<Accepted> accepteds = new ArrayList<Accepted>();
@@ -216,7 +223,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 					logger.info("Sending accept to server: "+promise.getServerID());
 					String serverID = promise.getServerID();
 					DatastoreInterface server = (DatastoreInterface) this.registry.lookup(serverID);
-					Accepted acceptedMessage = server.accept(proposalNumber, value);
+					Accepted acceptedMessage = server.accept(proposalNumber);
 					acceptedMessage.setServerID(promise.getServerID());
 					accepteds.add(acceptedMessage);
 					logger.info("Received accept");
@@ -230,12 +237,13 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 			}
 
 			if( accepteds.size() <= this.registry.list().length / 2) {
-				try {
+//				try {
 					logger.info("Majority of acceptors didn't accept, restarting paxos run in 2 seconds");
-					TimeUnit.SECONDS.sleep(2);
-				} catch (InterruptedException e) {
-					logger.log(Level.SEVERE, "Interrupted Exception", e);
-				}
+					electedAsLeaderBefore = false;
+//					TimeUnit.SECONDS.sleep(2);
+//				} catch (InterruptedException e) {
+//					logger.log(Level.SEVERE, "Interrupted Exception", e);
+//				}
 				continue;
 			}
 
@@ -258,6 +266,9 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 			}
 
 			logger.info("Learning job finished");
+			this.electedAsLeaderBefore = true;
+			this.multiPaxosProposalNumber = proposalNumber;
+			this.previousPromises = promises;
 
 			isRoundFailed = false;
 		}
@@ -273,7 +284,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 			throw new RemoteException();
 		}
 
-		if(proposalNumber<=this.previousProposalNumber) {
+		if(proposalNumber<this.previousProposalNumber) {
 			logger.info("Prepare request Declined as previous proposal number("+this.previousProposalNumber+") is greater than new proposal number("+proposalNumber+")");
 			throw new RemoteException();
 		}
@@ -289,7 +300,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 
 
 
-	public Accepted accept(long proposalNumber, Transaction value) throws RemoteException {
+	public Accepted accept(long proposalNumber) throws RemoteException {
 		// Acceptor is configured to fail at random times - If proposal number % randomAcceptorFailureNumber == 0
 		if(proposalNumber % this.randomAcceptorFailureNumber == 0l) {
 			logger.info("Acceptor failed at random time as per configuration");
@@ -301,8 +312,9 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 			throw new RemoteException();
 		}
 
-		logger.info("Accept request confirmed for transaction: "+value.toString());
+		logger.info("Accept request confirmed for transaction ");
 
+		this.previousProposalNumber = proposalNumber;
 		Accepted accepted = new Accepted();
 		accepted.setProposalNumber(proposalNumber);
 
@@ -312,14 +324,14 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 	public synchronized void invokeLearner(Accepted accepted, Transaction transaction) throws RemoteException{
 		logger.info("Learner invoked");
 
-		if(this.lastLearnedProposalNumber == accepted.getProposalNumber()) {
-			logger.info("Aborting learning, value is already learned");
-			throw new RemoteException();
-		}
+//		if(this.lastLearnedProposalNumber == accepted.getProposalNumber()) {
+//			logger.info("Aborting learning, value is already learned");
+//			throw new RemoteException();
+//		}
 
 		if(accepted.getServerID() == this.serverID) {
 			logger.info("Erasing previous proposal number and accepted value");
-			this.previousProposalNumber = 0;
+//			this.previousProposalNumber = 0;
 			this.previousAcceptedValue = null;
 		}
 
