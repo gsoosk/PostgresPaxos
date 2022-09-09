@@ -52,7 +52,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		super();
 		this.serverID = serverID;
 		this.registry = registry;
-		this.logger = getLogger("logs/"+serverID+"_server.log", false);
+		this.logger = getLogger("logs/"+serverID+"_server.log", true, false);
 		this.port = port;
 		this.storage = new Storage(postgresPort, logger);
 	}
@@ -246,7 +246,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 				try {
 					logger.info("Invoking learner: "+accepted.getServerID());
 					DatastoreInterface server = (DatastoreInterface) this.registry.lookup(accepted.getServerID());
-					server.invokeLearner(accepted);
+					server.invokeLearner(accepted, value);
 					logger.info("Learner was able to successfully learn");
 				}
 				catch(RemoteException re) {
@@ -305,12 +305,11 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 
 		Accepted accepted = new Accepted();
 		accepted.setProposalNumber(proposalNumber);
-		accepted.setValue(value);
 
 		return accepted;
 	}
 
-	public synchronized void invokeLearner(Accepted accepted) throws RemoteException{
+	public synchronized void invokeLearner(Accepted accepted, Transaction transaction) throws RemoteException{
 		logger.info("Learner invoked");
 
 		if(this.lastLearnedProposalNumber == accepted.getProposalNumber()) {
@@ -324,37 +323,38 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 			this.previousAcceptedValue = null;
 		}
 
-		Transaction trasaction = accepted.getValue();
-
-		if(trasaction.getType().equals("put")) {
-			this.storage.put(trasaction.getKey(), trasaction.getValue());
+		if(transaction.getType().equals("put")) {
+			this.storage.put(transaction.getKey(), transaction.getValue());
 		}
-		else if(trasaction.getType().equals("delete")){
-			this.storage.remove(trasaction.getKey());
+		else if(transaction.getType().equals("delete")){
+			this.storage.remove(transaction.getKey());
 		}
 		this.lastLearnedProposalNumber = accepted.getProposalNumber();
-		logger.info("Learned a new value: "+trasaction.toString());
+		logger.info("Learned a new value: "+transaction.toString());
 	}
 
 
 	//takes in the log-file path and builds a logger object
-	public static Logger getLogger(String logFile, Boolean verbose) {
-		Logger logger = Logger.getLogger("server_log");  
-		FileHandler fh;  
+	public static Logger getLogger(String logFile, Boolean verbose, Boolean fileVerbose) {
+		Logger logger = Logger.getLogger("server_log");
+		logger.setLevel(Level.INFO);
+		FileHandler fh;
 
 		try {
+			// This stops logs from getting displayed on console
 			if (!verbose)
 				logger.setUseParentHandlers(false);
-
-			File log = new File(logFile);
 			// if file does not exist we create a new file
-			if(!log.exists()) {
-				log.createNewFile();
+			if (fileVerbose) {
+				File log = new File(logFile);
+				if (!log.exists()) {
+					log.createNewFile();
+				}
+				fh = new FileHandler(logFile, true);
+				logger.addHandler(fh);
+				SimpleFormatter formatter = new SimpleFormatter();
+				fh.setFormatter(formatter);
 			}
-			fh = new FileHandler(logFile,true);  
-			logger.addHandler(fh);
-			SimpleFormatter formatter = new SimpleFormatter();  
-			fh.setFormatter(formatter);  
 
 		} catch (SecurityException e) {  
 			e.printStackTrace();  

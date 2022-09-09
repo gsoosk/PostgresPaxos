@@ -8,7 +8,7 @@ public class Accepted implements Serializable {
 	
 	private long proposalNumber;
 	
-	private Transaction value;
+//	private Transaction value;
 
 	public long getProposalNumber() {
 		return proposalNumber;
@@ -18,13 +18,13 @@ public class Accepted implements Serializable {
 		this.proposalNumber = proposalNumber;
 	}
 
-	public Transaction getValue() {
-		return value;
-	}
+//	public Transaction getValue() {
+//		return value;
+//	}
 
-	public void setValue(Transaction value) {
-		this.value = value;
-	}
+//	public void setValue(Transaction value) {
+//		this.value = value;
+//	}
 
 	public String getServerID() {
 		return serverID;
