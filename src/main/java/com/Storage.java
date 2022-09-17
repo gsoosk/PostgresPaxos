@@ -84,15 +84,19 @@ public class Storage {
     }
 
     public void put(String key, String value) {
-        String insertSQL = "INSERT INTO data(value, key) VALUES (?, ?)";
+        String insertSQL = "INSERT INTO data (key, value) " +
+                "VALUES (?,?)" +
+                "ON CONFLICT (key) DO UPDATE " +
+                "    SET value = excluded.value; ";
         String updateSQL = "UPDATE data SET value = ? WHERE key = ?";
-        String SQL = containsKey(key) ? updateSQL : insertSQL;
+//        String SQL = containsKey(key) ? updateSQL : insertSQL;
+        String SQL = insertSQL;
 
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(SQL)) {
 
-            pstmt.setString(1, value);
-            pstmt.setString(2, key);
+            pstmt.setString(1, key);
+            pstmt.setString(2, value);
 
             pstmt.executeUpdate();
         } catch (SQLException ex) {
@@ -135,9 +139,40 @@ public class Storage {
     }
 
 
-    public void putAll(HashMap<String, String> table) {
-        for(Map.Entry<String, String> entry : table.entrySet()) {
-            put(entry.getKey(), entry.getValue());
+    public void putAll(Map<String, String> table) {
+        String insertSQL = "INSERT INTO data (key, value) " +
+                "VALUES (?,?)" +
+                "ON CONFLICT (key) DO UPDATE " +
+                "    SET value = excluded.value; ";
+        String SQL = insertSQL;
+
+        try{
+            Connection conn = connect();
+
+            PreparedStatement pstmt = conn.prepareStatement(SQL);
+            for(Map.Entry<String, String> entry : table.entrySet()) {
+                pstmt.setString(1, entry.getKey());
+                pstmt.setString(2, entry.getValue());
+                pstmt.addBatch();
+            }
+
+            pstmt.executeBatch();
+            conn.close();
+        } catch (SQLException ex) {
+            logger.info(ex.getMessage());
         }
+    }
+
+    public void clear() {
+        String SQL = "DELETE FROM data";
+
+        try (Connection conn = connect();
+             PreparedStatement pstmt = conn.prepareStatement(SQL)) {
+
+            pstmt.executeUpdate();
+        } catch (SQLException ex) {
+            logger.info(ex.getMessage());
+        }
+
     }
 }

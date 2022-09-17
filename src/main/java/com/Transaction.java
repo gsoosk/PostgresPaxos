@@ -1,6 +1,7 @@
 package com;
 
 import java.io.Serializable;
+import java.util.Map;
 
 //The Request class contains information about the request sent from client to server
 public class Transaction implements Serializable{
@@ -13,6 +14,8 @@ public class Transaction implements Serializable{
 	// Data in the request
 	private String key;
 	private String value;
+
+	private Map<String, String> values = null;
 
 	public String getType() {
 		return type;
@@ -34,10 +37,18 @@ public class Transaction implements Serializable{
 	}
 	@Override
 	public String toString() {
+		if (values != null)
+			return "com.Transaction [type=" + type + "]";
 		return "com.Transaction [type=" + type + ", key=" + key + ", value=" + value
 				+ "]";
 	}
-	
-	
-	
+
+
+	public Map<String, String> getValues() {
+		return values;
+	}
+
+	public void setValues(Map<String, String> values) {
+		this.values = values;
+	}
 }

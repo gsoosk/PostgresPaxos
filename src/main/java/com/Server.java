@@ -8,10 +8,7 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -57,9 +54,10 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		super();
 		this.serverID = serverID;
 		this.registry = registry;
-		this.logger = getLogger("logs/"+serverID+"_server.log", true, false);
+		this.logger = getLogger("logs/"+serverID+"_server.log", false, false);
 		this.port = port;
 		this.storage = new Storage(postgresPort, logger);
+		storage.clear();
 	}
 
 	public void registerNewServer(String currentServerID, DatastoreInterface server) throws RemoteException{
@@ -127,6 +125,30 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		}
 
 		logger.info(response.toString());	
+		return response;
+	}
+
+	public Response batch(Map<String, String> values) throws RemoteException {
+		logger.info("Request Query [type=" + "batch" + "]");
+		Transaction transaction = new Transaction();
+		transaction.setType("batch");
+		transaction.setValues(values);
+
+		logger.info("Invoking Proposer");
+
+		Response response = new Response();
+		response.setType("batch");
+		response.setReturnValue(null);
+
+		try {
+			invokeProposer(transaction);
+			response.setMessage("Successfully inserted batch entries in the datastore");
+		}
+		catch(TimeoutException e) {
+			response.setMessage("Request timed out");
+		}
+
+		logger.info(response.toString());
 		return response;
 	}
 
@@ -238,7 +260,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 
 			if( accepteds.size() <= this.registry.list().length / 2) {
 //				try {
-					logger.info("Majority of acceptors didn't accept, restarting paxos run in 2 seconds");
+					logger.info("Majority of acceptors didn't accept, restarting paxos");
 					electedAsLeaderBefore = false;
 //					TimeUnit.SECONDS.sleep(2);
 //				} catch (InterruptedException e) {
@@ -336,10 +358,16 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		}
 
 		if(transaction.getType().equals("put")) {
+			logger.info("Learner putting data in db");
 			this.storage.put(transaction.getKey(), transaction.getValue());
 		}
 		else if(transaction.getType().equals("delete")){
+			logger.info("Learner deleting data in db");
 			this.storage.remove(transaction.getKey());
+		}
+		else if (transaction.getType().equals("batch")) {
+			logger.info("Learner putting data in db");
+			this.storage.putAll(transaction.getValues());
 		}
 		this.lastLearnedProposalNumber = accepted.getProposalNumber();
 		logger.info("Learned a new value: "+transaction.toString());
@@ -394,6 +422,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 	public static void main(String args[]) 
 	{ 
 		try {
+			System.setProperty("java.util.logging.SimpleFormatter.format", "[%1$tF %1$tT : %1$tL] [%4$-7s] %5$s %n");
 			int port = Integer.parseInt(args[0]);
 			Registry registry = LocateRegistry.createRegistry(Integer.parseInt(args[0]));
 			String currentServerID = createServerID(port);

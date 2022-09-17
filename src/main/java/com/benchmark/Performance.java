@@ -12,10 +12,7 @@ import java.nio.file.Paths;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Arrays;
+import java.util.*;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -41,10 +38,10 @@ public class Performance {
     private int port;
     DatastoreInterface datastore;
 
-    private static Logger logger = getLogger("logs/performance.log", true);
+    private static Logger logger = getLogger("logs/performance.log", true, false);
 
     //takes in the log-file path and builds a logger object
-    private static Logger getLogger(String logFile, Boolean verbose) {
+    private static Logger getLogger(String logFile, Boolean verbose, Boolean fileVerbose) {
         Logger logger = Logger.getLogger("performance_log");
         FileHandler fh;
 
@@ -53,14 +50,16 @@ public class Performance {
             if (!verbose)
                 logger.setUseParentHandlers(false);
             // if file does not exist we create a new file
-            File log = new File(logFile);
-            if(!log.exists()) {
-                log.createNewFile();
+            if (fileVerbose) {
+                File log = new File(logFile);
+                if (!log.exists()) {
+                    log.createNewFile();
+                }
+                fh = new FileHandler(logFile, true);
+                logger.addHandler(fh);
+                SimpleFormatter formatter = new SimpleFormatter();
+                fh.setFormatter(formatter);
             }
-            fh = new FileHandler(logFile,true);
-            logger.addHandler(fh);
-            SimpleFormatter formatter = new SimpleFormatter();
-            fh.setFormatter(formatter);
 
         } catch (SecurityException e) {
             e.printStackTrace();
@@ -80,10 +79,14 @@ public class Performance {
             /* parse args */
             address = res.getString("address");
             port = res.getInt("port");
+
             long numRecords = res.getLong("numRecords");
+            long warmup = 200;
+            numRecords += warmup;
             Integer recordSize = res.getInt("recordSize");
             int throughput = res.getInt("throughput");
             String payloadFilePath = res.getString("payloadFile");
+            Integer batchSize = res.getInt("batchSize");
 
             // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
             String payloadDelimiter = res.getString("payloadDelimiter").equals("\\n") ? "\n" : res.getString("payloadDelimiter");
@@ -105,14 +108,41 @@ public class Performance {
 
             connectToDataStore();
 
+            int batched = 0;
+            int data = 0;
+            Map<String, String> values = new HashMap<>();
+            List<Long> starts = new ArrayList<>();
+            boolean batching = batchSize != null;
             for (long i = 0; i < numRecords; i++) {
                 payload = generateRandomPayload(recordSize, payloadByteList, payload, random);
 
-
-                long sendStartMs = System.currentTimeMillis();
                 String record =  new String(payload, StandardCharsets.UTF_8);
-                datastore.put("test", record);
-                stats.nextCompletion(sendStartMs, payload.length);
+                long sendStartMs = System.currentTimeMillis();
+
+                if (!batching) {
+                    datastore.put("test", record);
+                    if (warmup < i)
+                        stats.nextCompletion(sendStartMs, payload.length);
+                }
+                else {
+                    if (batched < batchSize) {
+                        values.put("test" + data, record);
+                        data++;
+                        batched += record.length();
+                        starts.add(sendStartMs);
+                    }
+                    if (batched >= batchSize) {
+                        datastore.batch(values);
+                        values.clear();
+                        for (int j = 0 ; j < starts.size() ; j++) {
+                            if (i + j > warmup)
+                                stats.nextCompletion(starts.get(j), payload.length);
+                        }
+                        starts.clear();
+                        batched = 0;
+                    }
+                }
+
 
                 if (throttler.shouldThrottle(i, sendStartMs)) {
                     throttler.throttle();
@@ -139,7 +169,7 @@ public class Performance {
             try {
                 datastore = (DatastoreInterface) Naming.lookup("//" + address + ":" + port + "/com.Server");
                 break;
-            } catch (NotBoundException e) {
+            } catch (Exception e) {
                 System.out.println("Remote connection failed, trying again in 5 seconds");
                 logger.log(Level.SEVERE, "Remote connection failed", e);
                 // wait for 5 seconds before trying to re-establish connection
@@ -242,6 +272,14 @@ public class Performance {
                         "Payloads will be read from this file and a payload will be randomly selected when sending messages. " +
                         "Note that you must provide exactly one of --record-size or --payload-file.");
 
+        parser.addArgument("--batch-size")
+                .action(store())
+                .required(false)
+                .type(Integer.class)
+                .metavar("BATCH-SIZE")
+                .dest("batchSize")
+                .help("batch size in bytes. This producer batches records in this size and send them to kv store");
+
         parser.addArgument("--payload-delimiter")
                 .action(store())
                 .required(false)
@@ -329,8 +367,8 @@ public class Performance {
         public void printWindow() {
             long elapsed = System.currentTimeMillis() - windowStart;
             double recsPerSec = 1000.0 * windowCount / (double) elapsed;
-            double mbPerSec = 1000.0 * this.windowBytes / (double) elapsed / (1024.0 * 1024.0);
-            logger.info(String.format("%d records sent, %.1f records/sec (%.2f MB/sec), %.1f ms avg latency, %.1f ms max latency.%n",
+            double mbPerSec = 1000.0 * this.windowBytes / (double) elapsed / (1024.0);
+            logger.info(String.format("%d records sent, %.1f records/sec (%.3f KB/sec), %.1f ms avg latency, %.1f ms max latency.%n",
                     windowCount,
                     recsPerSec,
                     mbPerSec,
@@ -349,9 +387,9 @@ public class Performance {
         public void printTotal() {
             long elapsed = System.currentTimeMillis() - start;
             double recsPerSec = 1000.0 * count / (double) elapsed;
-            double mbPerSec = 1000.0 * this.bytes / (double) elapsed / (1024.0 * 1024.0);
+            double mbPerSec = 1000.0 * this.bytes / (double) elapsed / (1024.0);
             int[] percs = percentiles(this.latencies, index, 0.5, 0.95, 0.99, 0.999);
-            logger.info(String.format("%d records sent, %f records/sec (%.2f MB/sec), %.2f ms avg latency, %.2f ms max latency, %d ms 50th, %d ms 95th, %d ms 99th, %d ms 99.9th.%n",
+            logger.info(String.format("%d records sent, %f records/sec (%.3f KB/sec), %.2f ms avg latency, %.2f ms max latency, %d ms 50th, %d ms 95th, %d ms 99th, %d ms 99.9th.%n",
                     count,
                     recsPerSec,
                     mbPerSec,
@@ -361,6 +399,14 @@ public class Performance {
                     percs[1],
                     percs[2],
                     percs[3]));
+
+
+            logger.info(String.format("%.3f,%.2f,%.2f,%d,%d",
+                    mbPerSec,
+                    totalLatency / (double) count,
+                    (double) maxLatency,
+                    percs[0],
+                    percs[1]));
         }
 
         private static int[] percentiles(int[] latencies, int count, double... percentiles) {
