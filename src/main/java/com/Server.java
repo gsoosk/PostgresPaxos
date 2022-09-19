@@ -34,9 +34,9 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 
 	private int port;
 
-	private long previousProposalNumber;
+	private Map<String, Long> previousProposalNumber = new HashMap<>();
 
-	private Transaction previousAcceptedValue;
+	private Map<String, Transaction> previousAcceptedValue = new HashMap<>();
 
 	private long lastLearnedProposalNumber;
 
@@ -46,18 +46,17 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 	private int maxPaxosRetrys = 3;
 
 	// for multi paxos
-	private boolean electedAsLeaderBefore = false;
-	private long multiPaxosProposalNumber;
-	private List<Promise> previousPromises;
+	private Map<String, Boolean> electedAsLeaderBefore = new HashMap<>();
+	private Map<String, Long> multiPaxosProposalNumber = new HashMap<>();
+	private Map<String, List<Promise>> previousPromises = new HashMap<>();
 
 	protected Server(String serverID, Registry registry, int port, String postgresPort) throws RemoteException {
 		super();
 		this.serverID = serverID;
 		this.registry = registry;
-		this.logger = getLogger("logs/"+serverID+"_server.log", false, false);
+		this.logger = getLogger("logs/"+serverID+"_server.log", true, false);
 		this.port = port;
 		this.storage = new Storage(postgresPort, logger);
-		storage.clear();
 	}
 
 	public void registerNewServer(String currentServerID, DatastoreInterface server) throws RemoteException{
@@ -73,11 +72,14 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		this.serverID = serverID;
 	}
 
-	public HashMap<String, String> getStorage() throws RemoteException {
+	public HashMap<String, String> getStorage(String partitionId) throws RemoteException {
+		this.storage.setPartitionId(partitionId);
 		return storage.getAll();
 	}
 
-	public void setStorage(HashMap<String, String> storage) {
+	public void setStorage(HashMap<String, String> storage, String partitionId) {
+	    // TODO : fix this if multiple partition initialization needed
+		this.storage.setPartitionId(partitionId);
 		this.storage.putAll(storage);
 	}
 
@@ -103,12 +105,39 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 	}
 
 
-	public Response put(String key, String value) throws RemoteException {
+	@Override
+	public Response clear(String partitionId) throws RemoteException {
+		logger.info("Request Query [type=" + "clear"+ "]");
+		Transaction transaction = new Transaction();
+		transaction.setType("clear");
+		transaction.setPartitionID(partitionId);
+
+
+		logger.info("Invoking Proposer");
+		Response response = new Response();
+		response.setType("clear");
+		response.setReturnValue(null);
+
+		try{
+			invokeProposer(transaction);
+			response.setMessage("Successfully deleted the entry from the datastore");
+		}
+		catch(TimeoutException e) {
+			response.setMessage("Request timed out");
+		}
+
+		logger.info(response.toString());
+		return response;
+
+	}
+
+	public Response put(String key, String value, String partitionId) throws RemoteException {
 		logger.info("Request Query [type=" + "put" + ", key=" + key + ", value=" + value + "]");
 		Transaction transaction = new Transaction();
 		transaction.setType("put");
 		transaction.setKey(key);
 		transaction.setValue(value);
+		transaction.setPartitionID(partitionId);
 
 		logger.info("Invoking Proposer");
 
@@ -128,11 +157,12 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		return response;
 	}
 
-	public Response batch(Map<String, String> values) throws RemoteException {
+	public Response batch(Map<String, String> values, String partitionId) throws RemoteException {
 		logger.info("Request Query [type=" + "batch" + "]");
 		Transaction transaction = new Transaction();
 		transaction.setType("batch");
 		transaction.setValues(values);
+		transaction.setPartitionID(partitionId);
 
 		logger.info("Invoking Proposer");
 
@@ -152,12 +182,14 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		return response;
 	}
 
-	public Response delete(String key) throws RemoteException {
+	public Response delete(String key, String partitionId) throws RemoteException {
 		logger.info("Request Query [type=" + "delete" + ", key=" + key + "]");
 		Transaction transaction = new Transaction();
 		transaction.setType("delete");
 		transaction.setKey(key);
 		transaction.setValue(null);
+		transaction.setPartitionID(partitionId);
+
 
 		logger.info("Invoking Proposer");
 		Response response = new Response();
@@ -182,6 +214,8 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		boolean isRoundFailed = true;
 		int tryNumber = 1;
 
+		String partitionId = transaction.getPartitionID();
+
 		while(isRoundFailed){
 			if(tryNumber > this.maxPaxosRetrys) {
 				throw new TimeoutException();
@@ -189,9 +223,11 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 			tryNumber++;
 
 			logger.info("New Paxos round started");
-			long proposalNumber = electedAsLeaderBefore ? multiPaxosProposalNumber : System.currentTimeMillis();
-			List<Promise> promises = electedAsLeaderBefore ? this.previousPromises : new ArrayList<Promise>();
-			if (!electedAsLeaderBefore) {
+			if (!electedAsLeaderBefore.containsKey(partitionId))
+				electedAsLeaderBefore.put(partitionId, false);
+			long proposalNumber = electedAsLeaderBefore.get(partitionId) ? multiPaxosProposalNumber.get(partitionId) : System.currentTimeMillis();
+			List<Promise> promises = electedAsLeaderBefore.get(partitionId) ? previousPromises.get(partitionId) : new ArrayList<Promise>();
+			if (!electedAsLeaderBefore.get(partitionId)) {
 
 				logger.info("New proposal number is " + proposalNumber);
 
@@ -199,7 +235,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 					try {
 						logger.info("Sending prepare to server: " + serverID);
 						DatastoreInterface server = (DatastoreInterface) this.registry.lookup(serverID);
-						Promise promise = server.prepare(proposalNumber);
+						Promise promise = server.prepare(proposalNumber, partitionId);
 						logger.info("Received promise");
 						promise.setServerID(serverID);
 						promises.add(promise);
@@ -245,7 +281,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 					logger.info("Sending accept to server: "+promise.getServerID());
 					String serverID = promise.getServerID();
 					DatastoreInterface server = (DatastoreInterface) this.registry.lookup(serverID);
-					Accepted acceptedMessage = server.accept(proposalNumber);
+					Accepted acceptedMessage = server.accept(proposalNumber, partitionId);
 					acceptedMessage.setServerID(promise.getServerID());
 					accepteds.add(acceptedMessage);
 					logger.info("Received accept");
@@ -261,7 +297,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 			if( accepteds.size() <= this.registry.list().length / 2) {
 //				try {
 					logger.info("Majority of acceptors didn't accept, restarting paxos");
-					electedAsLeaderBefore = false;
+					electedAsLeaderBefore.put(partitionId, false);
 //					TimeUnit.SECONDS.sleep(2);
 //				} catch (InterruptedException e) {
 //					logger.log(Level.SEVERE, "Interrupted Exception", e);
@@ -288,9 +324,9 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 			}
 
 			logger.info("Learning job finished");
-			this.electedAsLeaderBefore = true;
-			this.multiPaxosProposalNumber = proposalNumber;
-			this.previousPromises = promises;
+			this.electedAsLeaderBefore.put(partitionId, true);
+			this.multiPaxosProposalNumber.put(partitionId, proposalNumber);
+			this.previousPromises.put(partitionId, promises);
 
 			isRoundFailed = false;
 		}
@@ -299,22 +335,22 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 
 
 
-	public Promise prepare(long proposalNumber) throws RemoteException {
+	public Promise prepare(long proposalNumber, String partitionId) throws RemoteException {
 		// Acceptor is configured to fail at random times - If proposal number % randomAcceptorFailureNumber == 0
 		if(proposalNumber % this.randomAcceptorFailureNumber == 0l) {
 			logger.info("Acceptor failed at random time as per configuration");
 			throw new RemoteException();
 		}
 
-		if(proposalNumber<this.previousProposalNumber) {
+		if(previousProposalNumber.containsKey(partitionId) && proposalNumber < this.previousProposalNumber.get(partitionId)) {
 			logger.info("Prepare request Declined as previous proposal number("+this.previousProposalNumber+") is greater than new proposal number("+proposalNumber+")");
 			throw new RemoteException();
 		}
 
 		Promise promise = new Promise();
 		promise.setProposalNumber(proposalNumber);
-		promise.setPreviousProposalNumber(this.previousProposalNumber);
-		promise.setPreviousAcceptedValue(previousAcceptedValue);
+		promise.setPreviousProposalNumber(previousProposalNumber.getOrDefault(partitionId, 0L));
+		promise.setPreviousAcceptedValue(previousAcceptedValue.getOrDefault(partitionId, null));
 
 		logger.info("Promising for proposal number: "+proposalNumber);
 		return promise;
@@ -322,21 +358,21 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 
 
 
-	public Accepted accept(long proposalNumber) throws RemoteException {
+	public Accepted accept(long proposalNumber, String partitionId) throws RemoteException {
 		// Acceptor is configured to fail at random times - If proposal number % randomAcceptorFailureNumber == 0
 		if(proposalNumber % this.randomAcceptorFailureNumber == 0l) {
 			logger.info("Acceptor failed at random time as per configuration");
 			throw new RemoteException();
 		}
 
-		if(proposalNumber<this.previousProposalNumber) {
+		if(previousProposalNumber.containsKey(partitionId) && proposalNumber < this.previousProposalNumber.get(partitionId)) {
 			logger.info("Accept request Declined as new proposal number("+proposalNumber+") is less than previous proposal numberr("+this.previousProposalNumber+")");
 			throw new RemoteException();
 		}
 
 		logger.info("Accept request confirmed for transaction ");
 
-		this.previousProposalNumber = proposalNumber;
+		this.previousProposalNumber.put(partitionId, proposalNumber);
 		Accepted accepted = new Accepted();
 		accepted.setProposalNumber(proposalNumber);
 
@@ -345,6 +381,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 
 	public synchronized void invokeLearner(Accepted accepted, Transaction transaction) throws RemoteException{
 		logger.info("Learner invoked");
+		this.storage.setPartitionId(transaction.getPartitionID());
 
 //		if(this.lastLearnedProposalNumber == accepted.getProposalNumber()) {
 //			logger.info("Aborting learning, value is already learned");
@@ -354,7 +391,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		if(accepted.getServerID() == this.serverID) {
 			logger.info("Erasing previous proposal number and accepted value");
 //			this.previousProposalNumber = 0;
-			this.previousAcceptedValue = null;
+//			this.previousAcceptedValue = null;
 		}
 
 		if(transaction.getType().equals("put")) {
@@ -368,6 +405,9 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		else if (transaction.getType().equals("batch")) {
 			logger.info("Learner putting data in db");
 			this.storage.putAll(transaction.getValues());
+		}
+		else if (transaction.getType().equals("clear")) {
+			this.storage.clear();
 		}
 		this.lastLearnedProposalNumber = accepted.getProposalNumber();
 		logger.info("Learned a new value: "+transaction.toString());
@@ -457,7 +497,8 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 							DatastoreInterface discoveredRegistryServer = (DatastoreInterface)discoveredRegistry.lookup(serverID);
 							if(!currentServerID.equals(discoveredRegistryServer.getServerID())) {
 								discoverySuccessful = true;
-								server.setStorage(discoveredRegistryServer.getStorage());
+								// TODO: if storage initialization needed
+//								server.setStorage(discoveredRegistryServer.getStorage(), );
 								discoveredRegistryServer.registerNewServer(currentServerID, server);
 								server.logger.info("Registered current server with server: "+discoveredRegistryServer.getServerID());
 								registry.bind(discoveredRegistryServer.getServerID(), discoveredRegistryServer);

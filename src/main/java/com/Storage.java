@@ -13,6 +13,7 @@ public class Storage {
 
     public Logger logger;
 
+    private String partitionId;
 
     public Storage(String port, Logger logger) {
         url = "jdbc:postgresql://localhost:" + port + "/postgres";
@@ -46,8 +47,12 @@ public class Storage {
 //
 //    }
 
+    private String getTable() {
+        return "data" + partitionId;
+    }
+
     public String get(String key) {
-        String SQL = "SELECT value FROM data WHERE key = ?";
+        String SQL = "SELECT value FROM " + getTable() + " WHERE key = ?";
         String value = null;
 
         try (Connection conn = connect();
@@ -66,7 +71,7 @@ public class Storage {
     }
 
     public Boolean containsKey(String key) {
-        String SQL = "SELECT value FROM data WHERE key = ?";
+        String SQL = "SELECT value FROM " + getTable() +  " WHERE key = ?";
 
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(SQL)) {
@@ -84,16 +89,13 @@ public class Storage {
     }
 
     public void put(String key, String value) {
-        String insertSQL = "INSERT INTO data (key, value) " +
+        String insertSQL = "INSERT INTO "+ getTable() +" (key, value) " +
                 "VALUES (?,?)" +
                 "ON CONFLICT (key) DO UPDATE " +
                 "    SET value = excluded.value; ";
-        String updateSQL = "UPDATE data SET value = ? WHERE key = ?";
-//        String SQL = containsKey(key) ? updateSQL : insertSQL;
-        String SQL = insertSQL;
 
         try (Connection conn = connect();
-             PreparedStatement pstmt = conn.prepareStatement(SQL)) {
+             PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
 
             pstmt.setString(1, key);
             pstmt.setString(2, value);
@@ -107,7 +109,7 @@ public class Storage {
 
     public void remove(String key) {
 
-        String SQL = "DELETE FROM data WHERE key = ?";;
+        String SQL = "DELETE FROM " + getTable() + " WHERE key = ?";;
 
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(SQL)) {
@@ -122,7 +124,7 @@ public class Storage {
     }
 
     public HashMap<String, String> getAll() {
-        String SQL = "SELECT * FROM data";
+        String SQL = "SELECT * FROM " + getTable();
         HashMap<String, String> table = new HashMap<>();
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(SQL)) {
@@ -140,7 +142,7 @@ public class Storage {
 
 
     public void putAll(Map<String, String> table) {
-        String insertSQL = "INSERT INTO data (key, value) " +
+        String insertSQL = "INSERT INTO " + getTable() + " (key, value) " +
                 "VALUES (?,?)" +
                 "ON CONFLICT (key) DO UPDATE " +
                 "    SET value = excluded.value; ";
@@ -164,7 +166,7 @@ public class Storage {
     }
 
     public void clear() {
-        String SQL = "DELETE FROM data";
+        String SQL = "DELETE FROM " + getTable();
 
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(SQL)) {
@@ -174,5 +176,9 @@ public class Storage {
             logger.info(ex.getMessage());
         }
 
+    }
+
+    public void setPartitionId(String partitionId) {
+        this.partitionId = partitionId;
     }
 }

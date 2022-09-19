@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.rmi.Naming;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.util.*;
 import java.util.logging.FileHandler;
@@ -120,7 +119,7 @@ public class Performance {
                 long sendStartMs = System.currentTimeMillis();
 
                 if (!batching) {
-                    datastore.put("test", record);
+                    datastore.put("test", record, "1");
                     if (warmup < i)
                         stats.nextCompletion(sendStartMs, payload.length);
                 }
@@ -132,7 +131,7 @@ public class Performance {
                         starts.add(sendStartMs);
                     }
                     if (batched >= batchSize) {
-                        datastore.batch(values);
+                        datastore.batch(values, "1");
                         values.clear();
                         for (int j = 0 ; j < starts.size() ; j++) {
                             if (i + j > warmup)

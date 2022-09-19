@@ -49,6 +49,8 @@ public class Client
 
 
 						if(command.equals("put")) {
+							System.out.print("Enter partition id: ");
+							String partition = reader.readLine();
 							System.out.print("Enter key: ");
 							String key = reader.readLine();
 							System.out.print("Enter value: ");
@@ -56,7 +58,7 @@ public class Client
 							logger.info("Request Query [ipaddress=" + this.address + ", type=" + command + ", key=" + key + ", value=" + value + "]");
 
 							// calls a remote procedure 'put'
-							Response response = datastore.put(key, value);
+							Response response = datastore.put(key, value, partition);
 							logger.info(response.toString());
 							System.out.println("com.Response Message: "+response.getMessage());
 
@@ -73,12 +75,14 @@ public class Client
 							System.out.println("com.Response result: "+response.getReturnValue());
 						}
 						else if(command.equals("delete")) {
+							System.out.print("Enter partition id: ");
+							String partition = reader.readLine();
 							System.out.print("Enter key: ");
 							String key = reader.readLine();
 							logger.info("Request Query [ipaddress=" + this.address + ", type=" + command + ", key=" + key + "]");
 
 							// calls a remote procedure 'delete'
-							Response response = datastore.delete(key);
+							Response response = datastore.delete(key, partition);
 							logger.info(response.toString());
 							System.out.println("com.Response Message: "+response.getMessage());
 						}

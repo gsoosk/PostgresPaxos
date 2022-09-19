@@ -17,6 +17,9 @@ public class Transaction implements Serializable{
 
 	private Map<String, String> values = null;
 
+
+	private String partitionID;
+
 	public String getType() {
 		return type;
 	}
@@ -38,8 +41,8 @@ public class Transaction implements Serializable{
 	@Override
 	public String toString() {
 		if (values != null)
-			return "com.Transaction [type=" + type + "]";
-		return "com.Transaction [type=" + type + ", key=" + key + ", value=" + value
+			return "com.Transaction [type=" + type + ", partition=" + partitionID + "]";
+		return "com.Transaction [type=" + type + ", key=" + key + ", value=" + value + ", partition=" + partitionID
 				+ "]";
 	}
 
@@ -50,5 +53,13 @@ public class Transaction implements Serializable{
 
 	public void setValues(Map<String, String> values) {
 		this.values = values;
+	}
+
+	public String getPartitionID() {
+		return partitionID;
+	}
+
+	public void setPartitionID(String partitionID) {
+		this.partitionID = partitionID;
 	}
 }
