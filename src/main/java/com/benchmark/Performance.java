@@ -2,7 +2,9 @@ package com.benchmark;
 
 import static net.sourceforge.argparse4j.impl.Arguments.store;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
@@ -86,7 +88,8 @@ public class Performance {
             int throughput = res.getInt("throughput");
             String payloadFilePath = res.getString("payloadFile");
             Integer batchSize = res.getInt("batchSize");
-
+            String resultFilePath = res.getString("resultFile") == null ? "result.csv" : res.getString("resultFile") ;
+            String partitionId = res.getString("partitionId");
             // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
             String payloadDelimiter = res.getString("payloadDelimiter").equals("\\n") ? "\n" : res.getString("payloadDelimiter");
 
@@ -100,7 +103,7 @@ public class Performance {
                 payload = new byte[recordSize];
             }
             Random random = new Random(0);
-            Stats stats = new Stats(numRecords, 5000);
+            Stats stats = new Stats(numRecords, 5000, resultFilePath, recordSize, batchSize);
             long startMs = System.currentTimeMillis();
 
             ThroughputThrottler throttler = new ThroughputThrottler(throughput, startMs);
@@ -119,7 +122,7 @@ public class Performance {
                 long sendStartMs = System.currentTimeMillis();
 
                 if (!batching) {
-                    datastore.put("test", record, "1");
+                    datastore.put("test", record, partitionId);
                     if (warmup < i)
                         stats.nextCompletion(sendStartMs, payload.length);
                 }
@@ -131,7 +134,7 @@ public class Performance {
                         starts.add(sendStartMs);
                     }
                     if (batched >= batchSize) {
-                        datastore.batch(values, "1");
+                        datastore.batch(values, partitionId);
                         values.clear();
                         for (int j = 0 ; j < starts.size() ; j++) {
                             if (i + j > warmup)
@@ -271,6 +274,22 @@ public class Performance {
                         "Payloads will be read from this file and a payload will be randomly selected when sending messages. " +
                         "Note that you must provide exactly one of --record-size or --payload-file.");
 
+        parser.addArgument("--result-file")
+                .action(store())
+                .required(false)
+                .type(String.class)
+                .metavar("RESULT-FILE")
+                .dest("resultFile")
+                .help("a csv file containing the total result of benchmark");
+
+        parser.addArgument("--partition-id")
+                .action(store())
+                .required(true)
+                .type(String.class)
+                .metavar("PARTITION-ID")
+                .dest("partitionId")
+                .help("Id of the partition that you want to put load on");
+
         parser.addArgument("--batch-size")
                 .action(store())
                 .required(false)
@@ -318,7 +337,12 @@ public class Performance {
         private long windowBytes;
         private long reportingInterval;
 
-        public Stats(long numRecords, int reportingInterval) {
+        private long numRecords;
+        private int recordSize;
+        private int batchSize;
+        private String resultFilePath;
+
+        public Stats(long numRecords, int reportingInterval, String resultFilePath, int recordSize, int batchSize) {
             this.start = System.currentTimeMillis();
             this.windowStart = System.currentTimeMillis();
             this.iteration = 0;
@@ -333,6 +357,25 @@ public class Performance {
             this.windowBytes = 0;
             this.totalLatency = 0;
             this.reportingInterval = reportingInterval;
+            this.resultFilePath = resultFilePath;
+            this.numRecords = numRecords;
+            this.recordSize = recordSize;
+            this.batchSize = batchSize;
+            if (!Files.exists(Paths.get(resultFilePath))){
+                String CSVHeader = "num of records, record size, batch size, throughput, average latency, max latency, 50th latency, 95th latency\n";
+                try {
+                    BufferedWriter out = new BufferedWriter(
+                            new FileWriter(resultFilePath, true));
+
+                    // Writing on output stream
+                    out.write(CSVHeader);
+                    // Closing the connection
+                    out.close();
+                }
+                catch (IOException ex) {
+                    logger.warning("Invalid path");
+                }
+            }
         }
 
         public void record(int iter, int latency, int bytes, long time) {
@@ -399,13 +442,28 @@ public class Performance {
                     percs[2],
                     percs[3]));
 
-
-            logger.info(String.format("%.3f,%.2f,%.2f,%d,%d",
+            String resultCSV = String.format("%d,%d,%d,%.3f,%.2f,%.2f,%d,%d\n",
+                    numRecords,
+                    recordSize,
+                    batchSize,
                     mbPerSec,
                     totalLatency / (double) count,
                     (double) maxLatency,
                     percs[0],
-                    percs[1]));
+                    percs[1]);
+            try {
+                BufferedWriter out = new BufferedWriter(
+                        new FileWriter(resultFilePath, true));
+
+                // Writing on output stream
+                out.write(resultCSV);
+                // Closing the connection
+                out.close();
+            }
+            catch (IOException ex) {
+                logger.warning("Invalid path");
+            }
+            logger.info(resultCSV);
         }
 
         private static int[] percentiles(int[] latencies, int count, double... percentiles) {
