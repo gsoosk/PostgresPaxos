@@ -54,7 +54,7 @@ public class Server extends UnicastRemoteObject implements DatastoreInterface
 		super();
 		this.serverID = serverID;
 		this.registry = registry;
-		this.logger = getLogger("logs/"+serverID+"_server.log", true, false);
+		this.logger = getLogger("logs/"+serverID+"_server.log", false, false);
 		this.port = port;
 		this.storage = new Storage(postgresPort, logger);
 	}

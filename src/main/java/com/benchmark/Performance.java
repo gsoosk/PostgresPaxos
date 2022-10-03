@@ -81,8 +81,8 @@ public class Performance {
             address = res.getString("address");
             port = res.getInt("port");
 
-            long numRecords = res.getLong("numRecords");
             long warmup = 200;
+            long numRecords = res.getLong("numRecords") == null ? Integer.MAX_VALUE - warmup - 2 : res.getLong("numRecords");
             numRecords += warmup;
             Integer recordSize = res.getInt("recordSize");
             int throughput = res.getInt("throughput");
@@ -92,6 +92,7 @@ public class Performance {
             String partitionId = res.getString("partitionId");
             // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
             String payloadDelimiter = res.getString("payloadDelimiter").equals("\\n") ? "\n" : res.getString("payloadDelimiter");
+            Long benchmarkTime = res.getLong("benchmarkTime");
 
 
             List<byte[]> payloadByteList = readPayloadFile(payloadFilePath, payloadDelimiter);
@@ -109,6 +110,8 @@ public class Performance {
             ThroughputThrottler throttler = new ThroughputThrottler(throughput, startMs);
 
             connectToDataStore();
+
+            datastore.clear(partitionId);
 
             int batched = 0;
             int data = 0;
@@ -145,6 +148,11 @@ public class Performance {
                     }
                 }
 
+                if (benchmarkTime != null) {
+                    long timeElapsed = (sendStartMs - startMs) / 1000;
+                    if (timeElapsed >= benchmarkTime)
+                        break;
+                }
 
                 if (throttler.shouldThrottle(i, sendStartMs)) {
                     throttler.throttle();
@@ -232,6 +240,11 @@ public class Performance {
                 .required(true)
                 .description("either --record-size or --payload-file must be specified but not both.");
 
+        MutuallyExclusiveGroup numberOptions = parser
+                .addMutuallyExclusiveGroup()
+                .required(true)
+                .description("either --num-records or --benchmark-time must be specified but not both.");
+
         parser.addArgument("--address")
                 .action(store())
                 .required(true)
@@ -248,13 +261,21 @@ public class Performance {
                 .dest("port")
                 .help("leader's port");
 
-        parser.addArgument("--num-records")
+        numberOptions.addArgument("--num-records")
                 .action(store())
-                .required(true)
+                .required(false)
                 .type(Long.class)
                 .metavar("NUM-RECORDS")
                 .dest("numRecords")
                 .help("number of messages to produce");
+
+        numberOptions.addArgument("--benchmark-time")
+                .action(store())
+                .required(false)
+                .type(Long.class)
+                .metavar("BENCHMARK-TIME")
+                .dest("benchmarkTime")
+                .help("benchmark time in seconds");
 
         payloadOptions.addArgument("--record-size")
                 .action(store())
@@ -443,7 +464,7 @@ public class Performance {
                     percs[3]));
 
             String resultCSV = String.format("%d,%d,%d,%.3f,%.2f,%.2f,%d,%d\n",
-                    numRecords,
+                    count,
                     recordSize,
                     batchSize,
                     mbPerSec,

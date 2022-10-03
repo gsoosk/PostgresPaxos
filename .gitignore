@@ -2,6 +2,9 @@ bin/
 log/
 .idea/
 test
+result.csv
+result/
+rerun.sh
 # Created by https://www.toptal.com/developers/gitignore/api/intellij,java,maven
 # Edit at https://www.toptal.com/developers/gitignore?templates=intellij,java,maven
 
