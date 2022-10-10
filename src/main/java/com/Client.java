@@ -86,6 +86,16 @@ public class Client
 							logger.info(response.toString());
 							System.out.println("com.Response Message: "+response.getMessage());
 						}
+						else if(command.equals("clear")) {
+							System.out.print("Enter partition id: ");
+							String partition = reader.readLine();
+							logger.info("Request Query [ipaddress=" + this.address + ", type=" + command + "]");
+
+							// calls a remote procedure 'delete'
+							Response response = datastore.clear(partition);
+							logger.info(response.toString());
+							System.out.println("com.Response Message: "+response.getMessage());
+						}
 					}
 					catch(Exception e) {
 						System.out.println("Request cannot be completed, trying to re-establish connection");

@@ -7,17 +7,17 @@ import shutil
 
 servers = [
     {
-        "port":"8000",
+        "port":"8001",
         "postgres":"5430",
         "partition":"1"
     },
     {
-        "port":"8001",
+        "port":"8002",
         "postgres":"5431",
         "partition":"2"
     },
     {
-        "port":"8002",
+        "port":"8003",
         "postgres":"5432",
         "partition":"3"
     }
@@ -27,11 +27,11 @@ server_jar = "./target/PaxosKV-server.jar"
 performance_jar = "./target/PaxosKV-performance.jar"
 
 
-batch_siize_start = 2000
-batch_size_end = 1000000
-batch_size_step = 10000
+batch_siize_start = 1500000
+batch_size_end = 2000000
+batch_size_step = 5000
 number_of_clients = 3
-benchmark_time = 30
+benchmark_time = 15
 result_folder = "./result"
 
 def runServers(): 
@@ -39,6 +39,7 @@ def runServers():
     for server in servers: 
         print (f'starting server {server["port"]}')
         s.append(subprocess.Popen(["java" , "-jar", server_jar, server["port"] , server["postgres"] , server["partition"]]))
+        time.sleep(3)
     return s
 
 def runBenchmark():
@@ -50,7 +51,6 @@ def runBenchmark():
         print(f"starting {number_of_clients} benchmark clients for batch size {batch_size}")
         clients = []
         for i in range(number_of_clients):
-            #--address 127.0.0.1 --port 8001 --benchmark-time 10 --throughput -1 --record-size 255 --batch-size 420000 --partition-id 1
             client = subprocess.Popen(
                 [
                     "java" , "-jar", performance_jar,
@@ -61,7 +61,7 @@ def runBenchmark():
                     "--record-size", "255", 
                     "--partition-id", str(i+1), 
                     "--batch-size", str(batch_size), 
-                    "--result-file", f'./result/result{i}.csv'
+                    "--result-file", f'./result/result_partition{i+1}.csv'
                 ]
             ) 
             clients.append(client)

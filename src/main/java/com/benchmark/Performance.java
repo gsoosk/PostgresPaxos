@@ -81,13 +81,13 @@ public class Performance {
             address = res.getString("address");
             port = res.getInt("port");
 
-            long warmup = 200;
+            Integer batchSize = res.getInt("batchSize");
+            Integer recordSize = res.getInt("recordSize");
+            long warmup = (batchSize / recordSize) * 4L;
             long numRecords = res.getLong("numRecords") == null ? Integer.MAX_VALUE - warmup - 2 : res.getLong("numRecords");
             numRecords += warmup;
-            Integer recordSize = res.getInt("recordSize");
             int throughput = res.getInt("throughput");
             String payloadFilePath = res.getString("payloadFile");
-            Integer batchSize = res.getInt("batchSize");
             String resultFilePath = res.getString("resultFile") == null ? "result.csv" : res.getString("resultFile") ;
             String partitionId = res.getString("partitionId");
             // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
@@ -110,7 +110,7 @@ public class Performance {
             ThroughputThrottler throttler = new ThroughputThrottler(throughput, startMs);
 
             connectToDataStore();
-
+            logger.info("Running benchmark for partition: " + partitionId);
             datastore.clear(partitionId);
 
             int batched = 0;
@@ -131,7 +131,7 @@ public class Performance {
                 }
                 else {
                     if (batched < batchSize) {
-                        values.put("test" + data, record);
+                        values.put("test_" + partitionId + "_" + data, record);
                         data++;
                         batched += record.length();
                         starts.add(sendStartMs);
@@ -141,7 +141,7 @@ public class Performance {
                         values.clear();
                         for (int j = 0 ; j < starts.size() ; j++) {
                             if (i + j > warmup)
-                                stats.nextCompletion(starts.get(j), payload.length);
+                                stats.nextCompletion(starts.get(j), payload.length + 5);
                         }
                         starts.clear();
                         batched = 0;
