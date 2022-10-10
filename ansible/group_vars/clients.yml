@@ -1,0 +1,8 @@
+---
+transactions:
+  - from: 2000
+    to: 2002
+    amount: 1
+  - from: 2000
+    to: 2001
+    amount: 1

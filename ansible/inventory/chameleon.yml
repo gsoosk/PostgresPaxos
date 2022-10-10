@@ -1,0 +1,38 @@
+all:
+  children:
+    
+    server1:
+      hosts:
+        192.5.87.138:
+          ansible_user: "cc"
+          ansible_connection: ssh
+
+      vars:
+        port: 8001
+        postgres: 5432
+        partition: 1
+  
+    server2:
+      hosts:
+        192.5.87.141:
+          ansible_user: "cc"
+          ansible_connection: ssh
+
+      vars:
+        port: 8002
+        postgres: 5432
+        partition: 2
+
+
+    server3:
+      hosts:
+        192.5.87.151:
+          ansible_user: "cc"
+          ansible_connection: ssh
+
+      vars:
+        port: 8003
+        postgres: 5432
+        partition: 3
+
+        

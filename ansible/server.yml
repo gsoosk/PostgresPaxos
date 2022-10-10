@@ -1,0 +1,23 @@
+---
+- name: Install Requirements (Java, Docker)
+  hosts:
+    - server1
+    - server2
+    - server3
+  become: yes
+  tasks:
+    - include_role:
+        name: common
+        tasks_from: install.yml
+
+- name: Run postgres
+  hosts:
+    - server1
+    - server2
+    - server3
+  become: yes
+  tasks:
+    - include_role:
+        name: postgres
+
+  

@@ -1,0 +1,48 @@
+# all:
+#   children:
+#     clients:
+#       hosts:
+#         localhost:
+#           ansible_connection: local # In remote execution this line should be removed
+#       vars: #TODO: find a way to have client and nodes for different remotes
+#         client_nodes:
+#           - 2000
+#           - 2001
+#           - 2002
+#     gensis:
+#       hosts:
+#           localhost:
+#             ansible_connection: local
+#       vars:
+#         node: 3000
+#         initial_transactions:
+#           - to: 2000
+#             amount: 10
+#           - to: 2001
+#             amount: 10
+#     miners:
+#       hosts:
+#         localhost:
+#           ansible_connection: local
+#       vars:
+#         central_hub: 3000
+#         server_nodes:
+#           - 3001
+#           - 3002
+#           - 3003
+
+all:
+  children:
+    server1:
+      hosts:
+        localhost:
+          ansible_connection: local # In remote execution this line should be removed
+      vars:
+        port: 8001
+        postgres: 5430
+        partition: 1
+      # vars: #TODO: find a way to have client and nodes for different remotes
+      #   client_nodes:
+      #     - 2000
+      #     - 2001
+      #     - 2002
