@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+option java_package = "com";
+option java_multiple_files = true;
+
+
+service PaxosServer {
+    rpc RegisterNewServer(ServerDetails) returns (Result) {}
+    rpc Put(Data) returns (Result) {}
+    rpc Get(Key) returns (Result) {}
+    rpc Delete(Key) returns (Result) {}
+    rpc Clear(Partition) returns (Result) {}
+    rpc Batch(Values) returns (Result) {}
+
+
+    // Paxos:
+    rpc Prepare(Proposal) returns (PromiseMessage) {}
+    rpc Accept(Proposal) returns (AcceptedMessage) {}
+    rpc Learn(TransactionMessage) returns  (Result) {}
+}
+
+message ServerDetails {
+    string server_id = 1;
+}
+
+message Empty {
+}
+
+message Data {
+    string key = 1;
+    string value = 2;
+    string partition_id = 3;
+}
+
+message Key {
+    string key = 1;
+    string partition_id = 2;
+}
+
+message Partition {
+    string partition_id = 1;
+}
+
+message Values {
+    string partition_id = 1;
+    map<string, string> values = 2;
+}
+
+message Result {
+    bool success = 1;
+    string message = 2;
+}
+
+message Proposal {
+    int64 proposal_number = 1;
+    string partition_id = 2;
+}
+
+message PromiseMessage {
+    int64 proposal_number = 1;
+    int64 previous_proposal_number = 2;
+}
+
+message AcceptedMessage {
+    int64 proposal_number = 1;
+}
+
+message TransactionMessage {
+    string type = 1;
+    string key = 2;
+    string value = 3;
+    string partition_id = 4;
+    int64 proposal_number = 5;
+    map<string, string> values = 6;
+    string server_id = 7;
+}

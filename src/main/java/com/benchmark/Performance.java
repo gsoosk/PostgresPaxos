@@ -19,7 +19,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
-import com.DatastoreInterface;
+import com.*;
+import io.grpc.ConnectivityState;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -37,7 +40,8 @@ public class Performance {
 
     private String address;
     private int port;
-    DatastoreInterface datastore;
+    private PaxosServerGrpc.PaxosServerBlockingStub datastore;
+    private ManagedChannel channel;
 
     private static Logger logger = getLogger("logs/performance.log", true, false);
 
@@ -111,7 +115,7 @@ public class Performance {
 
             connectToDataStore();
             logger.info("Running benchmark for partition: " + partitionId);
-            datastore.clear(partitionId);
+            datastore.clear(Partition.newBuilder().setPartitionId(partitionId).build());
 
             int batched = 0;
             int data = 0;
@@ -125,7 +129,11 @@ public class Performance {
                 long sendStartMs = System.currentTimeMillis();
 
                 if (!batching) {
-                    datastore.put("test", record, partitionId);
+                    datastore.put(Data.newBuilder()
+                            .setKey("test_" + i)
+                            .setValue(record)
+                            .setPartitionId(partitionId)
+                            .build());
                     if (warmup < i)
                         stats.nextCompletion(sendStartMs, payload.length);
                 }
@@ -137,7 +145,10 @@ public class Performance {
                         starts.add(sendStartMs);
                     }
                     if (batched >= batchSize) {
-                        datastore.batch(values, partitionId);
+                        datastore.batch(Values.newBuilder()
+                                .putAllValues(values)
+                                .setPartitionId(partitionId)
+                                .build());
                         values.clear();
                         for (int j = 0 ; j < starts.size() ; j++) {
                             if (i + j > warmup)
@@ -175,10 +186,13 @@ public class Performance {
     }
 
     private void connectToDataStore() throws MalformedURLException, RemoteException {
+        this.channel = ManagedChannelBuilder.forAddress(address, port).usePlaintext().build();
+        this.datastore = PaxosServerGrpc.newBlockingStub(channel);
+
         while (true) {
             try {
-                datastore = (DatastoreInterface) Naming.lookup("//" + address + ":" + port + "/com.Server");
-                break;
+                if (this.channel.getState(true) == ConnectivityState.READY)
+                    break;
             } catch (Exception e) {
                 System.out.println("Remote connection failed, trying again in 5 seconds");
                 logger.log(Level.SEVERE, "Remote connection failed", e);

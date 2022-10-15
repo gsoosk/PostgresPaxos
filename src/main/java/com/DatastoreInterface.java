@@ -18,6 +18,6 @@ public interface DatastoreInterface extends Remote{
 	public Promise prepare(long proposalNumber, String partitionId) throws RemoteException;
 	public Accepted accept(long proposalNumber, String partitionId) throws RemoteException;
 	public void invokeLearner(Accepted accepted, Transaction transaction) throws RemoteException;
-	public void registerNewServer(String currentServerID, DatastoreInterface server) throws RemoteException, AlreadyBoundException;
+	public void registerNewServer(String currentServerID);
 }
 
