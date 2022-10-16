@@ -39,7 +39,7 @@ def runServers():
     for server in servers: 
         print (f'starting server {server["port"]}')
         s.append(subprocess.Popen(["java" , "-jar", server_jar, server["port"] , server["postgres"] , server["partition"]]))
-        time.sleep(3)
+        time.sleep(1)
     return s
 
 def runBenchmark():
