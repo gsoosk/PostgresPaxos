@@ -24,10 +24,68 @@
             <artifactId>argparse4j</artifactId>
             <version>0.9.0</version>
         </dependency>
-    </dependencies>
+
+
+<!--        GRPC-->
+    <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-netty-shaded</artifactId>
+        <version>1.49.2</version>
+        <scope>runtime</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-protobuf</artifactId>
+        <version>1.49.2</version>
+    </dependency>
+    <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-stub</artifactId>
+        <version>1.49.2</version>
+    </dependency>
+    <dependency> <!-- necessary for Java 9+ -->
+        <groupId>org.apache.tomcat</groupId>
+        <artifactId>annotations-api</artifactId>
+        <version>6.0.53</version>
+        <scope>provided</scope>
+    </dependency>
+
+</dependencies>
+
 
     <build>
+
+        <extensions>
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>1.6.2</version>
+            </extension>
+        </extensions>
         <plugins>
+
+<!--            grpc-->
+            <plugin>
+                <groupId>org.xolstice.maven.plugins</groupId>
+                <artifactId>protobuf-maven-plugin</artifactId>
+                <version>0.6.1</version>
+                <configuration>
+                    <protocArtifact>com.google.protobuf:protoc:3.21.7:exe:${os.detected.classifier}</protocArtifact>
+                    <pluginId>grpc-java</pluginId>
+                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.49.2:exe:${os.detected.classifier}</pluginArtifact>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>compile</goal>
+                            <goal>compile-custom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -37,45 +95,46 @@
                 </configuration>
             </plugin>
             <plugin>
-                <artifactId>maven-assembly-plugin</artifactId>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
                 <executions>
                     <execution>
-                        <id>build-server</id>
-                        <configuration>
-                            <appendAssemblyId>false</appendAssemblyId>
-                            <archive>
-                                <manifest>
-                                    <mainClass>com.Server</mainClass>
-                                </manifest>
-                            </archive>
-                            <descriptorRefs>
-                                <descriptorRef>jar-with-dependencies</descriptorRef>
-                            </descriptorRefs>
-                            <finalName>${project.artifactId}-server</finalName>
-                        </configuration>
-                        <phase>package</phase>
+                        <id>1</id>
                         <goals>
-                            <goal>single</goal>
+                            <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <finalName>${project.artifactId}-server</finalName>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer">
+
+                                </transformer>
+                                <transformer implementation=
+                                                     "org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.PaxosServer</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
                     </execution>
                     <execution>
-                        <id>build-performance</id>
-                        <configuration>
-                            <appendAssemblyId>false</appendAssemblyId>
-                            <archive>
-                                <manifest>
-                                    <mainClass>com.benchmark.Performance</mainClass>
-                                </manifest>
-                            </archive>
-                            <descriptorRefs>
-                                <descriptorRef>jar-with-dependencies</descriptorRef>
-                            </descriptorRefs>
-                            <finalName>${project.artifactId}-performance</finalName>
-                        </configuration>
-                        <phase>package</phase>
+                        <id>2</id>
                         <goals>
-                            <goal>single</goal>
+                            <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <finalName>${project.artifactId}-performance</finalName>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer">
+
+                                </transformer>
+                                <transformer implementation=
+                                                     "org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.benchmark.Performance</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

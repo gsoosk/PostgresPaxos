@@ -19,7 +19,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
-import com.DatastoreInterface;
+import com.*;
+import io.grpc.ConnectivityState;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -37,7 +40,8 @@ public class Performance {
 
     private String address;
     private int port;
-    DatastoreInterface datastore;
+    private PaxosServerGrpc.PaxosServerBlockingStub datastore;
+    private ManagedChannel channel;
 
     private static Logger logger = getLogger("logs/performance.log", true, false);
 
@@ -81,17 +85,18 @@ public class Performance {
             address = res.getString("address");
             port = res.getInt("port");
 
-            long numRecords = res.getLong("numRecords");
-            long warmup = 200;
-            numRecords += warmup;
+            Integer batchSize = res.getInt("batchSize");
             Integer recordSize = res.getInt("recordSize");
+            long warmup = (batchSize / recordSize) * 4L;
+            long numRecords = res.getLong("numRecords") == null ? Integer.MAX_VALUE - warmup - 2 : res.getLong("numRecords");
+            numRecords += warmup;
             int throughput = res.getInt("throughput");
             String payloadFilePath = res.getString("payloadFile");
-            Integer batchSize = res.getInt("batchSize");
             String resultFilePath = res.getString("resultFile") == null ? "result.csv" : res.getString("resultFile") ;
             String partitionId = res.getString("partitionId");
             // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
             String payloadDelimiter = res.getString("payloadDelimiter").equals("\\n") ? "\n" : res.getString("payloadDelimiter");
+            Long benchmarkTime = res.getLong("benchmarkTime");
 
 
             List<byte[]> payloadByteList = readPayloadFile(payloadFilePath, payloadDelimiter);
@@ -109,6 +114,8 @@ public class Performance {
             ThroughputThrottler throttler = new ThroughputThrottler(throughput, startMs);
 
             connectToDataStore();
+            logger.info("Running benchmark for partition: " + partitionId);
+            datastore.clear(Partition.newBuilder().setPartitionId(partitionId).build());
 
             int batched = 0;
             int data = 0;
@@ -122,29 +129,41 @@ public class Performance {
                 long sendStartMs = System.currentTimeMillis();
 
                 if (!batching) {
-                    datastore.put("test", record, partitionId);
+                    datastore.put(Data.newBuilder()
+                            .setKey("test_" + i)
+                            .setValue(record)
+                            .setPartitionId(partitionId)
+                            .build());
                     if (warmup < i)
                         stats.nextCompletion(sendStartMs, payload.length);
                 }
                 else {
                     if (batched < batchSize) {
-                        values.put("test" + data, record);
+                        values.put("test_" + partitionId + "_" + data, record);
                         data++;
                         batched += record.length();
                         starts.add(sendStartMs);
                     }
                     if (batched >= batchSize) {
-                        datastore.batch(values, partitionId);
+                        datastore.batch(Values.newBuilder()
+                                .putAllValues(values)
+                                .setPartitionId(partitionId)
+                                .build());
                         values.clear();
                         for (int j = 0 ; j < starts.size() ; j++) {
                             if (i + j > warmup)
-                                stats.nextCompletion(starts.get(j), payload.length);
+                                stats.nextCompletion(starts.get(j), payload.length + 5);
                         }
                         starts.clear();
                         batched = 0;
                     }
                 }
 
+                if (benchmarkTime != null) {
+                    long timeElapsed = (sendStartMs - startMs) / 1000;
+                    if (timeElapsed >= benchmarkTime)
+                        break;
+                }
 
                 if (throttler.shouldThrottle(i, sendStartMs)) {
                     throttler.throttle();
@@ -167,10 +186,13 @@ public class Performance {
     }
 
     private void connectToDataStore() throws MalformedURLException, RemoteException {
+        this.channel = ManagedChannelBuilder.forAddress(address, port).usePlaintext().build();
+        this.datastore = PaxosServerGrpc.newBlockingStub(channel);
+
         while (true) {
             try {
-                datastore = (DatastoreInterface) Naming.lookup("//" + address + ":" + port + "/com.Server");
-                break;
+                if (this.channel.getState(true) == ConnectivityState.READY)
+                    break;
             } catch (Exception e) {
                 System.out.println("Remote connection failed, trying again in 5 seconds");
                 logger.log(Level.SEVERE, "Remote connection failed", e);
@@ -232,6 +254,11 @@ public class Performance {
                 .required(true)
                 .description("either --record-size or --payload-file must be specified but not both.");
 
+        MutuallyExclusiveGroup numberOptions = parser
+                .addMutuallyExclusiveGroup()
+                .required(true)
+                .description("either --num-records or --benchmark-time must be specified but not both.");
+
         parser.addArgument("--address")
                 .action(store())
                 .required(true)
@@ -248,13 +275,21 @@ public class Performance {
                 .dest("port")
                 .help("leader's port");
 
-        parser.addArgument("--num-records")
+        numberOptions.addArgument("--num-records")
                 .action(store())
-                .required(true)
+                .required(false)
                 .type(Long.class)
                 .metavar("NUM-RECORDS")
                 .dest("numRecords")
                 .help("number of messages to produce");
+
+        numberOptions.addArgument("--benchmark-time")
+                .action(store())
+                .required(false)
+                .type(Long.class)
+                .metavar("BENCHMARK-TIME")
+                .dest("benchmarkTime")
+                .help("benchmark time in seconds");
 
         payloadOptions.addArgument("--record-size")
                 .action(store())
@@ -443,7 +478,7 @@ public class Performance {
                     percs[3]));
 
             String resultCSV = String.format("%d,%d,%d,%.3f,%.2f,%.2f,%d,%d\n",
-                    numRecords,
+                    count,
                     recordSize,
                     batchSize,
                     mbPerSec,

@@ -1,6 +1,12 @@
 package com;
 
+import io.grpc.*;
+import io.grpc.stub.StreamObserver;
+
 import java.rmi.Naming;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -20,17 +26,23 @@ public class Client
 	// com.Client log is stored in logs folder
 	private Logger logger = getLogger("logs/client.log");
 
+	private ManagedChannel channel;
+	private PaxosServerGrpc.PaxosServerBlockingStub blockingStub;
+
 	public Client(String address, int port) 
 	{ 
 		this.address = address;
 		this.port = port;
+		this.channel = ManagedChannelBuilder.forAddress(address, port).usePlaintext().build();
+		this.blockingStub = PaxosServerGrpc.newBlockingStub(channel);
+
 	} 
 
 	public void start() {
+
 		while(true) {
 			try
 			{
-				datastore = (DatastoreInterface) Naming.lookup("//"+address+":"+port+"/com.Server");
 
 				System.out.println("Remote connection established  [ host:"+address+", port:"+port+" ]");
 				logger.info("Remote connection established  [ host:"+address+", port:"+port+" ]");
@@ -41,14 +53,13 @@ public class Client
 				while (!command.equals("exit")) 
 				{ 
 					try
-					{ 
-						// Reads the request command from the user
-						System.out.print("Enter request type (put/get/delete/exit): ");
+					{
+						TimeUnit.SECONDS.sleep(1);
+						System.out.print("Enter request type (put/get/delete/batch/clear/exit): ");
 						reader = new BufferedReader(new InputStreamReader(System.in));
 						command = reader.readLine().toLowerCase().trim();
 
-
-						if(command.equals("put")) {
+						 if(command.equals("put")) {
 							System.out.print("Enter partition id: ");
 							String partition = reader.readLine();
 							System.out.print("Enter key: ");
@@ -58,21 +69,23 @@ public class Client
 							logger.info("Request Query [ipaddress=" + this.address + ", type=" + command + ", key=" + key + ", value=" + value + "]");
 
 							// calls a remote procedure 'put'
-							Response response = datastore.put(key, value, partition);
-							logger.info(response.toString());
-							System.out.println("com.Response Message: "+response.getMessage());
+							Result result = blockingStub.put(Data.newBuilder().setKey(key).setValue(value).setPartitionId(partition).build());
+							logger.info(result.getMessage());
+							System.out.println("com.Response Message: "+result.getMessage());
 
 						}
 						else if(command.equals("get")) {
+						 	System.out.print("Enter partition id: ");
+						 	String partition = reader.readLine();
 							System.out.print("Enter key: ");
 							String key = reader.readLine();
 							logger.info("Request Query [ipaddress=" + this.address + ", type=" + command + ", key=" + key + "]");
 
 							// calls a remote procedure 'get'
-							Response response = datastore.get(key);
-							logger.info(response.toString());
-							System.out.println("com.Response Message: "+response.getMessage());
-							System.out.println("com.Response result: "+response.getReturnValue());
+							 Result result = blockingStub.get(Key.newBuilder().setKey(key).setPartitionId(partition).build());
+							logger.info(result.toString());
+							System.out.println("com.Response Message: "+result.getMessage());
+							System.out.println("com.Response result: "+result.getSuccess());
 						}
 						else if(command.equals("delete")) {
 							System.out.print("Enter partition id: ");
@@ -82,10 +95,33 @@ public class Client
 							logger.info("Request Query [ipaddress=" + this.address + ", type=" + command + ", key=" + key + "]");
 
 							// calls a remote procedure 'delete'
-							Response response = datastore.delete(key, partition);
-							logger.info(response.toString());
-							System.out.println("com.Response Message: "+response.getMessage());
+					 		Result result = blockingStub.delete(Key.newBuilder().setKey(key).setPartitionId(partition).build());
+							logger.info(result.toString());
+							System.out.println("com.Response Message: "+result.getMessage());
 						}
+						else if(command.equals("clear")) {
+							System.out.print("Enter partition id: ");
+							String partition = reader.readLine();
+							logger.info("Request Query [ipaddress=" + this.address + ", type=" + command + "]");
+
+							// calls a remote procedure 'delete'
+							 Result result = blockingStub.clear(Partition.newBuilder().setPartitionId(partition).build());
+							 logger.info(result.toString());
+							 System.out.println("com.Response Message: "+result.getMessage());
+						}
+						 else if(command.equals("batch")) {
+							 System.out.print("Enter partition id: ");
+							 String partition = reader.readLine();
+							 HashMap<String, String> values = new HashMap<String, String>() {{
+								 put("key1", "value1");
+								 put("key2", "value2");
+							 }};
+							 // calls a remote procedure 'get'
+							 Result result = blockingStub.batch(Values.newBuilder().setPartitionId(partition).putAllValues(values).build());
+							 logger.info(result.toString());
+							 System.out.println("com.Response Message: "+result.getMessage());
+							 System.out.println("com.Response result: "+result.getSuccess());
+						 }
 					}
 					catch(Exception e) {
 						System.out.println("Request cannot be completed, trying to re-establish connection");
