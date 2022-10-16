@@ -23,7 +23,7 @@ public class PaxosServer {
     private final int port;
 
     public PaxosServer(String serverID, int port, String postgresPort, ServerBuilder<?> serverBuilder) {
-        this.logger = getLogger("logs/"+serverID+"_server.log", true, false);
+        this.logger = getLogger("logs/"+serverID+"_server.log", false, false);
         this.server = serverBuilder
                 .addService(new PaxosServerService(serverID, port, postgresPort, logger))
                 .build();
@@ -194,7 +194,7 @@ public class PaxosServer {
             prop.load(input);
             String[] discoveryNodes = prop.getProperty("discovery.nodes").split(",");
 
-            ManagedChannel channelToSelf = ManagedChannelBuilder.forAddress("localhost", port).usePlaintext().build();
+            ManagedChannel channelToSelf = ManagedChannelBuilder.forAddress(InetAddress.getLocalHost().getHostAddress(), port).usePlaintext().build();
             PaxosServerGrpc.PaxosServerBlockingStub selfStub = PaxosServerGrpc.newBlockingStub(channelToSelf);
             selfStub.registerNewServer(ServerDetails.newBuilder().setServerId(currentServerID).build());
 
