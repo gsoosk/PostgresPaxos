@@ -21,9 +21,10 @@ public class PaxosServer {
     private final Server server;
 
     private final int port;
+    private static String ip = "";
 
     public PaxosServer(String serverID, int port, String postgresPort, ServerBuilder<?> serverBuilder) {
-        this.logger = getLogger("logs/"+serverID+"_server.log", false, false);
+        this.logger = getLogger("logs/"+serverID+"_server.log", true, false);
         this.server = serverBuilder
                 .addService(new PaxosServerService(serverID, port, postgresPort, logger))
                 .build();
@@ -185,7 +186,7 @@ public class PaxosServer {
         String id = null;
         try {
             InetAddress IP = InetAddress.getLocalHost();
-            id = IP.getHostAddress()+":"+String.valueOf(port);
+            id = ip != "" ? ip+":"+String.valueOf(port) : IP.getHostAddress()+":"+String.valueOf(port);
 
         } catch (UnknownHostException e) {
             // TODO Auto-generated catch block
@@ -200,6 +201,8 @@ public class PaxosServer {
             System.setProperty("java.util.logging.SimpleFormatter.format", "[%1$tF %1$tT : %1$tL] [%4$-7s] %5$s %n");
             int port = Integer.parseInt(args[0]);
             String postgresPort = args[1];
+            if (args.length > 3)
+                ip = args[3];
             PaxosServer paxosServer = new PaxosServer(createServerID(port), port, postgresPort, ServerBuilder.forPort(port));
 
             paxosServer.start();
@@ -275,7 +278,7 @@ public class PaxosServer {
         String[] data = currentServerID.split(":");
         String ip = data[0];
         int port = Integer.parseInt(data[1]);
-        return (discoveryNodeIPAddress.equals("localhost") || discoveryNodeIPAddress.equals("127.0.0.1") || discoveryNodeIPAddress.equals(ip))
+        return (discoveryNodeIPAddress.equals("localhost") || discoveryNodeIPAddress.equals("127.0.0.1") || discoveryNodeIPAddress.equals(ip) || discoveryNodeIPAddress.equals(PaxosServer.ip))
                 && discoveryNodePort == port;
     }
 

@@ -12,7 +12,7 @@
 - name: copy init file
   copy:
     src: init.sql
-    dest: ./postgres/init.sql
+    dest: ./postgres
 
 
 - name: Tear down existing services

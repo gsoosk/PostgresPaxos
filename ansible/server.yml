@@ -21,25 +21,25 @@
 #    - include_role:
 #        name: common
 #        tasks_from: install_java.yml
+
+- name: Run postgres
+  hosts:
+    - server1
+    - server2
+    - server3
+  become: yes
+  tasks:
+    - include_role:
+        name: postgres
 #
-#- name: Run postgres
-#  hosts:
-#    - server1
-#    - server2
-#    - server3
-#  become: yes
-#  tasks:
-#    - include_role:
-#        name: postgres
-#
-#
-#- name: Build server files
-#  hosts:
-#    - localhost
-#  tasks:
-#    - include_role:
-#        name: build
-#        tasks_from: build_server.yml
+
+- name: Build server files
+  hosts:
+    - localhost
+  tasks:
+    - include_role:
+        name: build
+        tasks_from: build_server.yml
 
 - name: Copy jar to servers
   hosts:
