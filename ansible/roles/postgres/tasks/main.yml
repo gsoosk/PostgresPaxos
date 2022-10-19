@@ -4,10 +4,15 @@
     state: directory 
     mode: 0755
 
-- name: 'copy files to remote'
+- name: copy docker compose
   copy:
     src: docker-compose.yml
     dest: ./postgres/docker-compose.yml
+
+- name: copy init file
+  copy:
+    src: init.sql
+    dest: ./postgres/init.sql
 
 
 - name: Tear down existing services
@@ -16,6 +21,9 @@
     state: absent
   become: true
 
+- name: Prune volumes
+  community.docker.docker_prune:
+    volumes: true
 
 - name: Create and start services
   community.docker.docker_compose:
