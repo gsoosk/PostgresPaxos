@@ -73,6 +73,10 @@ public class PaxosServer {
 
         @Override
         public void prepare(Proposal request, StreamObserver<PromiseMessage> responseObserver) {
+            if (Context.current().isCancelled()) {
+                responseObserver.onError(Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException());
+                return;
+            }
             try {
                 Promise promise = serverImplementation.prepare(request.getProposalNumber(), request.getPartitionId());
                 PromiseMessage message = PromiseMessage.newBuilder()
@@ -80,27 +84,35 @@ public class PaxosServer {
                         .setPreviousProposalNumber(promise.getPreviousProposalNumber())
                         .build();
                 responseObserver.onNext(message);
+                responseObserver.onCompleted();
             } catch (RemoteException e) {
                 responseObserver.onError(Status.ABORTED.asRuntimeException());
             }
-            responseObserver.onCompleted();
         }
 
         @Override
         public void accept(Proposal request, StreamObserver<AcceptedMessage> responseObserver) {
+            if (Context.current().isCancelled()) {
+                responseObserver.onError(Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException());
+                return;
+            }
             try {
                 Accepted accepted = serverImplementation.accept(request.getProposalNumber(), request.getPartitionId());
                 responseObserver.onNext(AcceptedMessage.newBuilder()
                         .setProposalNumber(accepted.getProposalNumber())
                         .build());
+                responseObserver.onCompleted();
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-            responseObserver.onCompleted();
         }
 
         @Override
         public void learn(TransactionMessage request, StreamObserver<Result> responseObserver) {
+            if (Context.current().isCancelled()) {
+                responseObserver.onError(Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException());
+                return;
+            }
             serverImplementation.invokeLearner(request);
             responseObserver.onNext(Result.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
@@ -129,6 +141,10 @@ public class PaxosServer {
 
         @Override
         public void batch(Values request, StreamObserver<Result> responseObserver) {
+            if (Context.current().isCancelled()) {
+                responseObserver.onError(Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException());
+                return;
+            }
             Response response = serverImplementation.batch(request.getValuesMap(), request.getPartitionId());
             responseObserver.onNext(Result.newBuilder().setSuccess(true).setMessage(response.getMessage()).build());
             responseObserver.onCompleted();
