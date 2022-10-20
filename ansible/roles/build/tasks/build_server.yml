@@ -7,6 +7,13 @@
   copy:
     src: ../../../src/
     dest: /tmp/paxos/src/
+ 
+
+- name: Create resource directory
+  file:
+    path: /tmp/paxos/resources
+    state: directory
+    mode: 0755
 
 - name: copy
   copy:

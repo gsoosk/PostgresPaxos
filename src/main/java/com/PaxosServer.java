@@ -24,7 +24,7 @@ public class PaxosServer {
     private static String ip = "";
 
     public PaxosServer(String serverID, int port, String postgresPort, ServerBuilder<?> serverBuilder) {
-        this.logger = getLogger("logs/"+serverID+"_server.log", true, false);
+        this.logger = getLogger("logs/"+serverID+"_server.log", false, false);
         this.server = serverBuilder
                 .addService(new PaxosServerService(serverID, port, postgresPort, logger))
                 .build();
