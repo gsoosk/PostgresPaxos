@@ -3,7 +3,10 @@ logs/
 .idea/
 test
 result.csv
+metrics.csv
 result/
+metric/
+metric*
 result*
 rerun.sh
 # Created by https://www.toptal.com/developers/gitignore/api/intellij,java,maven

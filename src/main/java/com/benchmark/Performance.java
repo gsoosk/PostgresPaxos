@@ -18,7 +18,6 @@ import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
-import java.util.stream.Collectors;
 
 import com.*;
 import io.grpc.*;
@@ -96,6 +95,7 @@ public class Performance {
             int throughput = res.getInt("throughput");
             String payloadFilePath = res.getString("payloadFile");
             String resultFilePath = res.getString("resultFile") == null ? "result.csv" : res.getString("resultFile") ;
+            String metricsFilePath = res.getString("metricsFile") == null ? "metrics.csv" : res.getString("metricsFile") ;
             String partitionId = res.getString("partitionId");
             // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
             String payloadDelimiter = res.getString("payloadDelimiter").equals("\\n") ? "\n" : res.getString("payloadDelimiter");
@@ -114,7 +114,7 @@ public class Performance {
                 payload = new byte[recordSize];
             }
             Random random = new Random(0);
-            Stats stats = new Stats(numRecords, 5000, resultFilePath, recordSize, batchSize, interval, timeout);
+            Stats stats = new Stats(numRecords, 1000, resultFilePath, metricsFilePath, recordSize, batchSize, interval, timeout);
             long startMs = System.currentTimeMillis();
 
             ThroughputThrottler throttler = new ThroughputThrottler(throughput, startMs);
@@ -435,6 +435,14 @@ public class Performance {
                 .dest("resultFile")
                 .help("a csv file containing the total result of benchmark");
 
+        parser.addArgument("--metric-file")
+                .action(store())
+                .required(false)
+                .type(String.class)
+                .metavar("METRIC-FILE")
+                .dest("metricsFile")
+                .help("a csv file containing the timeline result of benchmark");
+
         parser.addArgument("--partition-id")
                 .action(store())
                 .required(true)
@@ -494,6 +502,10 @@ public class Performance {
                 .metavar("MAXRETRY")
                 .help("Maximum number of times a request can be retried");
 
+//        parser.addArgument("--dynamic-batch")
+//                .action(store())
+//                .type()
+
 
 
 
@@ -525,7 +537,9 @@ public class Performance {
         private int timeout;
         private Map<Long, Integer> retries;
 
-        public Stats(long numRecords, int reportingInterval, String resultFilePath, int recordSize, int batchSize, int interval, int timeout) {
+        private String metricsFilePath;
+
+        public Stats(long numRecords, int reportingInterval, String resultFilePath, String metricsFilePath, int recordSize, int batchSize, int interval, int timeout) {
             this.start = System.currentTimeMillis();
             this.windowStart = System.currentTimeMillis();
             this.iteration = 0;
@@ -541,12 +555,17 @@ public class Performance {
             this.totalLatency = 0;
             this.reportingInterval = reportingInterval;
             this.resultFilePath = resultFilePath;
+            this.metricsFilePath = metricsFilePath;
             this.numRecords = numRecords;
             this.recordSize = recordSize;
             this.batchSize = batchSize;
             this.interval = interval;
             this.timeout = timeout;
             this.retries = new HashMap<>();
+            createResultCSVFiles(resultFilePath, metricsFilePath);
+        }
+
+        private void createResultCSVFiles(String resultFilePath, String metricFilePath) {
             if (!Files.exists(Paths.get(resultFilePath))){
                 String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, average latency, max latency, 50th latency, 95th latency, requests retried, retries\n";
                 try {
@@ -561,6 +580,20 @@ public class Performance {
                 catch (IOException ex) {
                     logger.warning("Invalid path");
                 }
+            }
+
+            String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, average latency, max latency, requests retried, retries\n";
+            try {
+                BufferedWriter out = new BufferedWriter(
+                        new FileWriter(metricFilePath, false));
+
+                // Writing on output stream
+                out.write(CSVHeader);
+                // Closing the connection
+                out.close();
+            }
+            catch (IOException ex) {
+                logger.warning("Invalid path");
             }
         }
 
@@ -608,6 +641,32 @@ public class Performance {
                     mbPerSec,
                     windowTotalLatency / (double) windowCount,
                     (double) windowMaxLatency));
+
+            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%d\n",
+                    count,
+                    recordSize,
+                    interval,
+                    timeout,
+                    batchSize,
+                    mbPerSec,
+                    windowTotalLatency / (double) windowCount,
+                    (double) maxLatency,
+                    (double) maxLatency,
+                    (double) maxLatency,
+                    retries.size(),
+                    retries.values().stream().mapToInt(Integer::intValue).sum());
+            try {
+                BufferedWriter out = new BufferedWriter(
+                        new FileWriter(metricsFilePath, true));
+
+                // Writing on output stream
+                out.write(resultCSV);
+                // Closing the connection
+                out.close();
+            }
+            catch (IOException ex) {
+                logger.warning("Invalid path");
+            }
         }
 
         public void newWindow() {
