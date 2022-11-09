@@ -1,5 +1,6 @@
 package com.benchmark;
 
+import static net.sourceforge.argparse4j.impl.Arguments.append;
 import static net.sourceforge.argparse4j.impl.Arguments.store;
 
 import java.io.BufferedWriter;
@@ -77,7 +78,7 @@ public class Performance {
         return logger;
     }
 
-    void start(String[] args) throws IOException {
+    void start(String[] args) throws Exception {
         ArgumentParser parser = argParser();
 
         try {
@@ -103,7 +104,16 @@ public class Performance {
             Integer interval = res.getInt("interval");
             Integer timeout = res.getInt("timeout") != null ? res.getInt("timeout") : interval * 2;
             Integer maxRetry = res.getInt("maxRetry");
-
+            List<Integer> dynamicBatchSize = res.getList("dynamicBatchSize");
+            List<Integer> dynamicBatchTimes = res.getList("dynamicBatchTime");
+            int currentBatchIndex = 0;
+            boolean dynamicBatching = false;
+            if (dynamicBatchSize != null && dynamicBatchTimes != null ) {
+                if (dynamicBatchSize.size() != dynamicBatchTimes.size())
+                    throw new Exception("number of dynamic batch times and batch sizes should be equal");
+                batchSize = dynamicBatchSize.get(currentBatchIndex);
+                dynamicBatching = true;
+            }
 
             List<byte[]> payloadByteList = readPayloadFile(payloadFilePath, payloadDelimiter);
 
@@ -138,6 +148,8 @@ public class Performance {
             long requestsId = 0;
 
             boolean batching = batchSize != null;
+            long sendingStart = System.currentTimeMillis();
+            long lastDynamicBatchCheckpoint = System.currentTimeMillis();
             for (long i = 0; i < numRecords; i++) {
                 payload = generateRandomPayload(recordSize, payloadByteList, payload, random);
 
@@ -225,9 +237,22 @@ public class Performance {
                 }
 
                 if (benchmarkTime != null) {
-                    long timeElapsed = (sendStartMs - startMs) / 1000;
+                    long timeElapsed = (sendStartMs - sendingStart) / 1000;
                     if (timeElapsed >= benchmarkTime)
                         break;
+                }
+
+                if (dynamicBatching && currentBatchIndex < dynamicBatchSize.size()) {
+                    long timeElapsed = (sendStartMs - lastDynamicBatchCheckpoint) / 1000;
+                    if (timeElapsed >= dynamicBatchTimes.get(currentBatchIndex)) {
+                        lastDynamicBatchCheckpoint = System.currentTimeMillis();
+                        currentBatchIndex++;
+                        if (currentBatchIndex < dynamicBatchSize.size()) {
+                            batchSize = dynamicBatchSize.get(currentBatchIndex);
+                            logger.info("Changed batch size to " + batchSize);
+                            stats.updateBatchSize(batchSize);
+                        }
+                    }
                 }
 
                 if (throttler.shouldThrottle(i, sendStartMs)) {
@@ -502,9 +527,22 @@ public class Performance {
                 .metavar("MAXRETRY")
                 .help("Maximum number of times a request can be retried");
 
-//        parser.addArgument("--dynamic-batch")
-//                .action(store())
-//                .type()
+        parser.addArgument("--dynamic-batch-size")
+                .action(append())
+                .required(false)
+                .type(Integer.class)
+                .dest("dynamicBatchSize")
+                .metavar("DYNAMICBATCHSIZE")
+                .help("dynamic batch size until a specific time");
+
+        parser.addArgument("--dynamic-batch-time")
+                .action(append())
+                .required(false)
+                .type(Integer.class)
+                .dest("dynamicBatchTime")
+                .metavar("DYNAMICBATCHTIME")
+                .help("deadline for a dynamic batch size");
+
 
 
 
@@ -743,6 +781,10 @@ public class Performance {
 
         public Integer getNumberOfRetries(long c) {
             return retries.getOrDefault(c, 0);
+        }
+
+        public void updateBatchSize(Integer batchSize) {
+            this.batchSize = batchSize;
         }
     }
 
