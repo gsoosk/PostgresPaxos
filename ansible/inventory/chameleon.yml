@@ -9,7 +9,7 @@ all:
 
       vars:
         port: 8001
-        postgres: 5432
+        postgres: 9000
         partition: 1
   
     server2:
@@ -20,7 +20,7 @@ all:
 
       vars:
         port: 8002
-        postgres: 5432
+        postgres: 9000
         partition: 2
 
 
@@ -32,7 +32,7 @@ all:
 
       vars:
         port: 8003
-        postgres: 5432
+        postgres: 9000
         partition: 3
 
     client:
