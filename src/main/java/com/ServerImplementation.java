@@ -417,6 +417,7 @@ public class ServerImplementation
 		if(transaction.getType().equals("put")) {
 			logger.info("Learner putting data in db");
 			this.storage.put(transaction.getKey(), transaction.getValue());
+			logger.info("Learned a new value: "+transaction.toString());
 		}
 		else if(transaction.getType().equals("delete")){
 			logger.info("Learner deleting data in db");
@@ -430,7 +431,6 @@ public class ServerImplementation
 			this.storage.clear();
 		}
 		this.lastLearnedProposalNumber = transaction.getProposalNumber();
-		logger.info("Learned a new value: "+transaction.toString());
 	}
 
 } 

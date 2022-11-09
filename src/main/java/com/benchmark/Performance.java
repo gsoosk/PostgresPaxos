@@ -18,6 +18,7 @@ import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
+import java.util.stream.Collectors;
 
 import com.*;
 import io.grpc.*;
@@ -31,6 +32,8 @@ import net.sourceforge.argparse4j.inf.MutuallyExclusiveGroup;
 
 
 public class Performance {
+
+    private static final Integer INFINITY = -1;
 
     public static void main(String[] args) throws Exception {
         Performance perf = new Performance();
@@ -99,6 +102,7 @@ public class Performance {
             Long benchmarkTime = res.getLong("benchmarkTime");
             Integer interval = res.getInt("interval");
             Integer timeout = res.getInt("timeout") != null ? res.getInt("timeout") : interval * 2;
+            Integer maxRetry = res.getInt("maxRetry");
 
 
             List<byte[]> payloadByteList = readPayloadFile(payloadFilePath, payloadDelimiter);
@@ -127,8 +131,11 @@ public class Performance {
             List<Values> retries = Collections.synchronizedList(new ArrayList<>());
             List<List<Long>> retryStarts = Collections.synchronizedList(new ArrayList<>());
             List<Integer> sent = Collections.synchronizedList(new ArrayList<>());
+//            HashMap<Integer, Integer>  numOfRetries = new HashMap<>();
             sent.add(0);
             sent.add(0);
+
+            long requestsId = 0;
 
             boolean batching = batchSize != null;
             for (long i = 0; i < numRecords; i++) {
@@ -157,6 +164,7 @@ public class Performance {
                         Values request = Values.newBuilder()
                                 .putAllValues(values)
                                 .setPartitionId(partitionId)
+                                .setId(++requestsId)
                                 .build();
                         long c = i;
                         List<Long> copyStarts = new ArrayList<>(starts);
@@ -200,7 +208,8 @@ public class Performance {
                                     Thread.sleep(1);
                                      while (retries.size() != 0) {
 //                                         logger.info("retry size is " + retries.size());
-                                        retry(warmup, timeout, stats, retries, retryStarts, sent, c, recordSize);
+                                         if (stats.getNumberOfRetries(retries.get(0).getId()) < maxRetry || maxRetry.equals(INFINITY))
+                                            retry(warmup, timeout, stats, retries, retryStarts, sent, c, recordSize);
                                         retries.remove(0);
                                         retryStarts.remove(0);
                                     }
@@ -265,6 +274,7 @@ public class Performance {
     private void retry(long warmup, Integer timeout, Stats stats, List<Values> retries, List<List<Long>> retryStarts, List<Integer> sent, long c, int length) {
         List<Long> toRetryStart = retryStarts.get(0);
         Values retryRequest = retries.get(0);
+        stats.addRetry(retryRequest.getId());
         StreamObserver<Result> retryObserver = new StreamObserver<>() {
             @Override
             public void onNext(Result result) {
@@ -475,6 +485,15 @@ public class Performance {
                 .metavar("TIMEOUT")
                 .help("timeout of each batch request. It is two times of interval by default");
 
+        parser.addArgument("--max-retry")
+                .action(store())
+                .required(false)
+                .setDefault(-1)
+                .type(Integer.class)
+                .dest("maxRetry")
+                .metavar("MAXRETRY")
+                .help("Maximum number of times a request can be retried");
+
 
 
 
@@ -504,6 +523,7 @@ public class Performance {
         private String resultFilePath;
         private int interval;
         private int timeout;
+        private Map<Long, Integer> retries;
 
         public Stats(long numRecords, int reportingInterval, String resultFilePath, int recordSize, int batchSize, int interval, int timeout) {
             this.start = System.currentTimeMillis();
@@ -526,8 +546,9 @@ public class Performance {
             this.batchSize = batchSize;
             this.interval = interval;
             this.timeout = timeout;
+            this.retries = new HashMap<>();
             if (!Files.exists(Paths.get(resultFilePath))){
-                String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, average latency, max latency, 50th latency, 95th latency\n";
+                String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, average latency, max latency, 50th latency, 95th latency, requests retried, retries\n";
                 try {
                     BufferedWriter out = new BufferedWriter(
                             new FileWriter(resultFilePath, true));
@@ -602,7 +623,7 @@ public class Performance {
             double recsPerSec = 1000.0 * count / (double) elapsed;
             double mbPerSec = 1000.0 * this.bytes / (double) elapsed / (1024.0);
             int[] percs = percentiles(this.latencies, index, 0.5, 0.95, 0.99, 0.999);
-            logger.info(String.format("%d records sent, %f records/sec (%.3f KB/sec), %.2f ms avg latency, %.2f ms max latency, %d ms 50th, %d ms 95th, %d ms 99th, %d ms 99.9th.%n",
+            logger.info(String.format("%d records sent, %f records/sec (%.3f KB/sec), %.2f ms avg latency, %.2f ms max latency, %d ms 50th, %d ms 95th, %d ms 99th, %d ms 99.9th.%n --  requests retried: %d, retries: %d\n",
                     count,
                     recsPerSec,
                     mbPerSec,
@@ -611,9 +632,11 @@ public class Performance {
                     percs[0],
                     percs[1],
                     percs[2],
-                    percs[3]));
+                    percs[3],
+                    retries.size(),
+                    retries.values().stream().mapToInt(Integer::intValue).sum()));
 
-            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.2f,%.2f,%d,%d\n",
+            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.2f,%.2f,%d,%d,%d,%d\n",
                     count,
                     recordSize,
                     interval,
@@ -623,7 +646,9 @@ public class Performance {
                     totalLatency / (double) count,
                     (double) maxLatency,
                     percs[0],
-                    percs[1]);
+                    percs[1],
+                    retries.size(),
+                    retries.values().stream().mapToInt(Integer::intValue).sum());
             try {
                 BufferedWriter out = new BufferedWriter(
                         new FileWriter(resultFilePath, true));
@@ -648,6 +673,17 @@ public class Performance {
                 values[i] = latencies[index];
             }
             return values;
+        }
+
+        public void addRetry(long c) {
+            if (retries.containsKey(c))
+                retries.put(c, retries.get(c) + 1);
+            else
+                retries.put(c, 1);
+        }
+
+        public Integer getNumberOfRetries(long c) {
+            return retries.getOrDefault(c, 0);
         }
     }
 
