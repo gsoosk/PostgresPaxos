@@ -89,8 +89,19 @@ public class Performance {
             port = res.getInt("port");
 
             Integer batchSize = res.getInt("batchSize");
+
+            List<Integer> dynamicBatchSize = res.getList("dynamicBatchSize");
+            List<Integer> dynamicBatchTimes = res.getList("dynamicBatchTime");
+            int currentBatchIndex = 0;
+            boolean dynamicBatching = false;
+            if (dynamicBatchSize != null && dynamicBatchTimes != null ) {
+                if (dynamicBatchSize.size() != dynamicBatchTimes.size())
+                    throw new Exception("number of dynamic batch times and batch sizes should be equal");
+                batchSize = dynamicBatchSize.get(currentBatchIndex);
+                dynamicBatching = true;
+            }
             Integer recordSize = res.getInt("recordSize");
-            long warmup = (batchSize / recordSize) * 4L;
+            long warmup = batchSize != null ? (batchSize / recordSize) * 4L : 100;
             long numRecords = res.getLong("numRecords") == null ? Integer.MAX_VALUE - warmup - 2 : res.getLong("numRecords");
             numRecords += warmup;
             int throughput = res.getInt("throughput");
@@ -104,16 +115,6 @@ public class Performance {
             Integer interval = res.getInt("interval");
             Integer timeout = res.getInt("timeout") != null ? res.getInt("timeout") : interval * 2;
             Integer maxRetry = res.getInt("maxRetry");
-            List<Integer> dynamicBatchSize = res.getList("dynamicBatchSize");
-            List<Integer> dynamicBatchTimes = res.getList("dynamicBatchTime");
-            int currentBatchIndex = 0;
-            boolean dynamicBatching = false;
-            if (dynamicBatchSize != null && dynamicBatchTimes != null ) {
-                if (dynamicBatchSize.size() != dynamicBatchTimes.size())
-                    throw new Exception("number of dynamic batch times and batch sizes should be equal");
-                batchSize = dynamicBatchSize.get(currentBatchIndex);
-                dynamicBatching = true;
-            }
 
             List<byte[]> payloadByteList = readPayloadFile(payloadFilePath, payloadDelimiter);
 
@@ -124,7 +125,7 @@ public class Performance {
                 payload = new byte[recordSize];
             }
             Random random = new Random(0);
-            Stats stats = new Stats(numRecords, 1000, resultFilePath, metricsFilePath, recordSize, batchSize, interval, timeout);
+            Stats stats = new Stats(numRecords, 2000, resultFilePath, metricsFilePath, recordSize, batchSize, interval, timeout);
             long startMs = System.currentTimeMillis();
 
             ThroughputThrottler throttler = new ThroughputThrottler(throughput, startMs);
@@ -166,6 +167,7 @@ public class Performance {
                         stats.nextCompletion(sendStartMs, payload.length);
                 }
                 else {
+                    stats.report(System.currentTimeMillis());
                     if (batched < batchSize) {
                         values.put("test_" + partitionId + "_" + data, record);
                         data++;
@@ -224,6 +226,8 @@ public class Performance {
                                             retry(warmup, timeout, stats, retries, retryStarts, sent, c, recordSize);
                                         retries.remove(0);
                                         retryStarts.remove(0);
+                                        if (System.currentTimeMillis() < startToWaitTime + interval)
+                                            break;
                                     }
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
@@ -648,6 +652,10 @@ public class Performance {
                 this.latencies[index] = latency;
                 this.index++;
             }
+            report(time);
+        }
+
+        private void report(long time) {
             /* maybe report the recent perf */
             if (time - windowStart >= reportingInterval) {
                 printWindow();
