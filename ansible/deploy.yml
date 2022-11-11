@@ -1,0 +1,46 @@
+
+---
+- name: Run postgres
+  hosts:
+    - server1
+    - server2
+    - server3
+  become: yes
+  tasks:
+    - include_role:
+        name: postgres
+
+
+- name: Build server files
+  hosts:
+    - localhost
+  tasks:
+    - include_role:
+        name: build
+        tasks_from: build_server.yml
+
+- name: Copy jar to servers
+  hosts:
+    - server1
+    - server2
+    - server3
+  become: yes
+
+  tasks:
+    - include_role:
+        name: build
+        tasks_from: copy_jar.yml
+      vars:
+        jar: PaxosKV-server
+
+
+- name: Copy jar to client
+  hosts:
+    - client
+  become: yes
+  tasks:
+    - include_role:
+        name: build
+        tasks_from: copy_jar.yml
+      vars:
+        - jar: PaxosKV-performance
