@@ -29,7 +29,7 @@
   tasks:
     - include_role:
         name: build
-        tasks_from: copy_jar.yml
+        tasks_from: copy_server.yml
       vars:
         jar: PaxosKV-server
 

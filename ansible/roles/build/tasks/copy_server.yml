@@ -1,0 +1,21 @@
+- name: Create target directory
+  file:
+    path: paxos
+    state: directory
+    mode: 0755
+
+- name: Create resource directory
+  file:
+    path:  ./paxos/resources
+    state: directory
+    mode: 0755
+
+- name: copy
+  copy:
+    content: "discovery.nodes={{hostvars[ groups['server1'][0] ]['discovery_ip']}}:{{hostvars[ groups['server1'][0] ]['port']}},{{hostvars[ groups['server2'][0] ]['discovery_ip']}}:{{hostvars[ groups['server2'][0] ]['port']}},{{hostvars[ groups['server3'][0] ]['discovery_ip']}}:{{hostvars[ groups['server3'][0] ]['port']}}\ndiscovery.self={{hostvars[inventory_hostname]['discovery_ip']}}\njava.util.logging.SimpleFormatter.format=[%1$tF %1$tT] [%4$-7s] %5$s %n"
+    dest: ./paxos/resources/config.properties
+
+- name: copy file to remote
+  copy:
+    src: "/tmp/paxos/target/{{jar}}.jar"
+    dest: "./paxos/{{jar}}.jar"

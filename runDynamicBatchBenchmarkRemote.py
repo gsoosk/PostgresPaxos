@@ -11,23 +11,27 @@ import paramiko
 
 servers = [
     {
-        "address":"129.114.109.1", 
+        "address":"129.114.108.105",
+        "ip":"10.52.2.90",
         "port": "8001",
         "postgres": "9000",
-        "partition": "1"
+        "partition": "3"
     },
     {
         "address":"129.114.109.112",
+        "ip":"10.52.2.124",
         "port": "8002",
         "postgres": "9000",
         "partition": "2"
     },
     {
-        "address":"129.114.108.105",
+        "address":"129.114.109.1", 
+        "ip":"10.52.3.62",
         "port": "8003",
         "postgres": "9000",
-        "partition": "3"
+        "partition": "1"
     }
+
 ]
 client_address = "129.114.108.225"
 
@@ -94,7 +98,7 @@ def runClients(interval, batch_size, dummy=False):
         process = [
                         "ssh", f'cc@{client_address}', "cd", "paxos", "&&", "sudo",
                         "java", "-jar", performance_jar,
-                        "--address", servers[i]['address'],
+                        "--address", servers[i]['ip'],
                         "--port", servers[i]['port'],
                         "--benchmark-time", time,
                         "--throughput", "-1",

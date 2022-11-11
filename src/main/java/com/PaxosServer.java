@@ -201,17 +201,18 @@ public class PaxosServer {
             System.setProperty("java.util.logging.SimpleFormatter.format", "[%1$tF %1$tT : %1$tL] [%4$-7s] %5$s %n");
             int port = Integer.parseInt(args[0]);
             String postgresPort = args[1];
-            if (args.length > 3)
-                ip = args[3];
-            PaxosServer paxosServer = new PaxosServer(createServerID(port), port, postgresPort, ServerBuilder.forPort(port));
 
-            paxosServer.start();
-
-            String currentServerID = createServerID(port);
             InputStream input = new FileInputStream("resources/config.properties");
             Properties prop = new Properties();
             prop.load(input);
+            ip = prop.getProperty("discovery.self");
+            String currentServerID = createServerID(port);
             String[] discoveryNodes = prop.getProperty("discovery.nodes").split(",");
+
+
+            PaxosServer paxosServer = new PaxosServer(createServerID(port), port, postgresPort, ServerBuilder.forPort(port));
+
+            paxosServer.start();
 
             ManagedChannel channelToSelf = ManagedChannelBuilder.forAddress(InetAddress.getLocalHost().getHostAddress(), port).usePlaintext().build();
             PaxosServerGrpc.PaxosServerBlockingStub selfStub = PaxosServerGrpc.newBlockingStub(channelToSelf);
