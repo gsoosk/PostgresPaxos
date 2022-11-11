@@ -3,12 +3,13 @@ all:
     
     server1:
       hosts:
-        129.114.109.1:
+        129.114.108.105:
           ansible_user: "cc"
           ansible_connection: ssh
 
       vars:
         port: 8001
+        discovery_ip: 10.52.2.90
         postgres: 9000
         partition: 1
   
@@ -20,18 +21,20 @@ all:
 
       vars:
         port: 8002
+        discovery_ip: 10.52.2.124
         postgres: 9000
         partition: 2
 
 
     server3:
       hosts:
-        129.114.108.105:
+        129.114.109.1:
           ansible_user: "cc"
           ansible_connection: ssh
 
       vars:
         port: 8003
+        discovery_ip: 10.52.3.62
         postgres: 9000
         partition: 3
 
