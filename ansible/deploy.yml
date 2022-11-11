@@ -27,13 +27,6 @@
   become: yes
 
   tasks:
-    #    - name: open the port
-    #      ufw:
-    #        rule: allow
-    #        port: "{{item}}"
-    #      loop:
-    ##        - "{{hostvars[inventory_hostname]['port']}}"
-    ##        - "{{hostvars[inventory_hostname]['postgres']}}"
     - include_role:
         name: build
         tasks_from: copy_jar.yml
