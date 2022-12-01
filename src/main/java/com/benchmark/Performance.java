@@ -151,6 +151,7 @@ public class Performance {
             boolean batching = batchSize != null;
             long sendingStart = System.currentTimeMillis();
             long lastDynamicBatchCheckpoint = System.currentTimeMillis();
+//            TODO: Refactor this function
             for (long i = 0; i < numRecords; i++) {
                 payload = generateRandomPayload(recordSize, payloadByteList, payload, random);
 
@@ -158,6 +159,7 @@ public class Performance {
                 long sendStartMs = System.currentTimeMillis();
 
                 if (!batching) {
+                    stats.nextAdded(payload.length);
                     datastore.put(Data.newBuilder()
                             .setKey("test_" + i)
                             .setValue(record)
@@ -183,6 +185,7 @@ public class Performance {
                         long c = i;
                         List<Long> copyStarts = new ArrayList<>(starts);
                         if (interval == -1) {
+                            stats.nextAdded((recordSize + 5) * request.getValuesMap().size());
                             datastore.batch(request);
                             long end = System.currentTimeMillis();
                             for (int j = 0 ; j < starts.size() ; j++) {
@@ -213,6 +216,7 @@ public class Performance {
                                     }
                                 }
                             };
+                            stats.nextAdded((recordSize + 5) * request.getValuesMap().size());
                             asyncDatastore.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS).batch(request, observer);
                             sent.set(0, sent.get(0)+1);
                             sent.set(1, sent.get(1)+1);
@@ -326,6 +330,7 @@ public class Performance {
                 }
             }
         };
+        stats.nextAdded((length + 5) * retryRequest.getValuesMap().size());
         asyncDatastore.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS).batch(retryRequest, retryObserver);
     }
 
@@ -580,6 +585,9 @@ public class Performance {
         private Map<Long, Integer> retries;
 
         private String metricsFilePath;
+        private int started;
+        private int startedBytes;
+        private int startedWindowBytes;
 
         public Stats(long numRecords, int reportingInterval, String resultFilePath, String metricsFilePath, int recordSize, int batchSize, int interval, int timeout) {
             this.start = System.currentTimeMillis();
@@ -588,6 +596,9 @@ public class Performance {
             this.sampling = (int) (numRecords / Math.min(numRecords, 500000));
             this.latencies = new int[(int) (numRecords / this.sampling) + 1];
             this.index = 0;
+            this.started = 0;
+            this.startedBytes = 0;
+            this.startedWindowBytes = 0;
             this.maxLatency = 0;
             this.totalLatency = 0;
             this.windowCount = 0;
@@ -609,7 +620,7 @@ public class Performance {
 
         private void createResultCSVFiles(String resultFilePath, String metricFilePath) {
             if (!Files.exists(Paths.get(resultFilePath))){
-                String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, average latency, max latency, 50th latency, 95th latency, requests retried, retries\n";
+                String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, goodput, average latency, max latency, 50th latency, 95th latency, requests retried, retries\n";
                 try {
                     BufferedWriter out = new BufferedWriter(
                             new FileWriter(resultFilePath, true));
@@ -624,7 +635,7 @@ public class Performance {
                 }
             }
 
-            String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, average latency, max latency, requests retried, retries\n";
+            String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, goodput, average latency, max latency, requests retried, retries\n";
             try {
                 BufferedWriter out = new BufferedWriter(
                         new FileWriter(metricFilePath, false));
@@ -668,7 +679,15 @@ public class Performance {
             int latency = (int) (now - start);
             record(iteration, latency, bytes, now);
             this.iteration++;
+        }
 
+        public synchronized void nextAdded(int bytes) {
+            long now = System.currentTimeMillis();
+            this.started++;
+            this.startedBytes += bytes;
+            this.startedWindowBytes += bytes;
+
+            report(now);
         }
 
         public void nextCompletion(long start, long end, int bytes) {
@@ -681,23 +700,24 @@ public class Performance {
             long elapsed = System.currentTimeMillis() - windowStart;
             double recsPerSec = 1000.0 * windowCount / (double) elapsed;
             double mbPerSec = 1000.0 * this.windowBytes / (double) elapsed / (1024.0);
-            logger.info(String.format("%d records sent, %.1f records/sec (%.3f KB/sec), %.1f ms avg latency, %.1f ms max latency.%n",
+            double throughputMbPerSec = 1000.0 * this.startedWindowBytes / (double) elapsed / (1024.0);
+            logger.info(String.format("%d records sent, %.1f records/sec (%.3f KB/sec) of (%.3f KB/sec), %.1f ms avg latency, %.1f ms max latency.%n",
                     windowCount,
                     recsPerSec,
                     mbPerSec,
+                    throughputMbPerSec,
                     windowTotalLatency / (double) windowCount,
                     (double) windowMaxLatency));
 
-            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%d\n",
+            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.3f,%.2f,%.2f,%d,%d\n",
                     count,
                     recordSize,
                     interval,
                     timeout,
                     batchSize,
+                    throughputMbPerSec,
                     mbPerSec,
                     windowTotalLatency / (double) windowCount,
-                    (double) maxLatency,
-                    (double) maxLatency,
                     (double) maxLatency,
                     retries.size(),
                     retries.values().stream().mapToInt(Integer::intValue).sum());
@@ -721,17 +741,20 @@ public class Performance {
             this.windowMaxLatency = 0;
             this.windowTotalLatency = 0;
             this.windowBytes = 0;
+            this.startedWindowBytes = 0;
         }
 
         public void printTotal() {
             long elapsed = System.currentTimeMillis() - start;
             double recsPerSec = 1000.0 * count / (double) elapsed;
             double mbPerSec = 1000.0 * this.bytes / (double) elapsed / (1024.0);
+            double throughputMbPerSec = 1000.0 * this.startedBytes / (double) elapsed / (1024.0);
             int[] percs = percentiles(this.latencies, index, 0.5, 0.95, 0.99, 0.999);
-            logger.info(String.format("%d records sent, %f records/sec (%.3f KB/sec), %.2f ms avg latency, %.2f ms max latency, %d ms 50th, %d ms 95th, %d ms 99th, %d ms 99.9th.%n --  requests retried: %d, retries: %d\n",
+            logger.info(String.format("%d records sent, %f records/sec (%.3f KB/sec) of (%.3f KB/sec), %.2f ms avg latency, %.2f ms max latency, %d ms 50th, %d ms 95th, %d ms 99th, %d ms 99.9th.%n --  requests retried: %d, retries: %d\n",
                     count,
                     recsPerSec,
                     mbPerSec,
+                    throughputMbPerSec,
                     totalLatency / (double) count,
                     (double) maxLatency,
                     percs[0],
@@ -741,12 +764,13 @@ public class Performance {
                     retries.size(),
                     retries.values().stream().mapToInt(Integer::intValue).sum()));
 
-            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.2f,%.2f,%d,%d,%d,%d\n",
+            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.3f,%.2f,%.2f,%d,%d,%d,%d\n",
                     count,
                     recordSize,
                     interval,
                     timeout,
                     batchSize,
+                    throughputMbPerSec,
                     mbPerSec,
                     totalLatency / (double) count,
                     (double) maxLatency,
