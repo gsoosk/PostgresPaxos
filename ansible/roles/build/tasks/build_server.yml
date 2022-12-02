@@ -1,0 +1,31 @@
+
+- name:
+  debug:
+    msg: "{{groups['server1'][0]}}:{{hostvars[ groups['server1'][0] ]['port']}},{{groups['server2'][0]}}:{{hostvars[ groups['server2'][0] ]['port']}},{{groups['server3'][0]}}:{{hostvars[ groups['server3'][0] ]['port']}}"
+
+- name: copy source
+  copy:
+    src: ../../../src/
+    dest: /tmp/paxos/src/
+ 
+
+- name: Create resource directory
+  file:
+    path: /tmp/paxos/resources
+    state: directory
+    mode: 0755
+
+- name: copy
+  copy:
+    content: "discovery.nodes={{hostvars[ groups['server1'][0] ]['discovery_ip']}}:{{hostvars[ groups['server1'][0] ]['port']}},{{hostvars[ groups['server2'][0] ]['discovery_ip']}}:{{hostvars[ groups['server2'][0] ]['port']}},{{hostvars[ groups['server3'][0] ]['discovery_ip']}}:{{hostvars[ groups['server3'][0] ]['port']}}\njava.util.logging.SimpleFormatter.format=[%1$tF %1$tT] [%4$-7s] %5$s %n"
+    dest: /tmp/paxos/resources/config.properties
+
+- name: copy pom
+  copy:
+    src: ../../../pom.xml
+    dest: /tmp/paxos/pom.xml
+
+- name: build
+  command: mvn clean install
+  args:
+    chdir: /tmp/paxos/

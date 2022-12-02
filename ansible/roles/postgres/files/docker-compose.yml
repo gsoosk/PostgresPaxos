@@ -1,0 +1,20 @@
+version: '3.5'
+
+services:
+  postgres_service:
+    container_name: postgres_service
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+      PGDATA: /data/postgres
+    volumes:
+      - postgres:/data/postgres
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "127.0.0.1:9000:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres:

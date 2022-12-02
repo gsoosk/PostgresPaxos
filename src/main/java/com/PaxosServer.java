@@ -21,6 +21,7 @@ public class PaxosServer {
     private final Server server;
 
     private final int port;
+    private static String ip = "";
 
     public PaxosServer(String serverID, int port, String postgresPort, ServerBuilder<?> serverBuilder) {
         this.logger = getLogger("logs/"+serverID+"_server.log", false, false);
@@ -73,6 +74,10 @@ public class PaxosServer {
 
         @Override
         public void prepare(Proposal request, StreamObserver<PromiseMessage> responseObserver) {
+            if (Context.current().isCancelled()) {
+                responseObserver.onError(Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException());
+                return;
+            }
             try {
                 Promise promise = serverImplementation.prepare(request.getProposalNumber(), request.getPartitionId());
                 PromiseMessage message = PromiseMessage.newBuilder()
@@ -80,27 +85,35 @@ public class PaxosServer {
                         .setPreviousProposalNumber(promise.getPreviousProposalNumber())
                         .build();
                 responseObserver.onNext(message);
+                responseObserver.onCompleted();
             } catch (RemoteException e) {
                 responseObserver.onError(Status.ABORTED.asRuntimeException());
             }
-            responseObserver.onCompleted();
         }
 
         @Override
         public void accept(Proposal request, StreamObserver<AcceptedMessage> responseObserver) {
+            if (Context.current().isCancelled()) {
+                responseObserver.onError(Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException());
+                return;
+            }
             try {
                 Accepted accepted = serverImplementation.accept(request.getProposalNumber(), request.getPartitionId());
                 responseObserver.onNext(AcceptedMessage.newBuilder()
                         .setProposalNumber(accepted.getProposalNumber())
                         .build());
+                responseObserver.onCompleted();
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
-            responseObserver.onCompleted();
         }
 
         @Override
         public void learn(TransactionMessage request, StreamObserver<Result> responseObserver) {
+            if (Context.current().isCancelled()) {
+                responseObserver.onError(Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException());
+                return;
+            }
             serverImplementation.invokeLearner(request);
             responseObserver.onNext(Result.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
@@ -129,6 +142,10 @@ public class PaxosServer {
 
         @Override
         public void batch(Values request, StreamObserver<Result> responseObserver) {
+            if (Context.current().isCancelled()) {
+                responseObserver.onError(Status.CANCELLED.withDescription("Cancelled by client").asRuntimeException());
+                return;
+            }
             Response response = serverImplementation.batch(request.getValuesMap(), request.getPartitionId());
             responseObserver.onNext(Result.newBuilder().setSuccess(true).setMessage(response.getMessage()).build());
             responseObserver.onCompleted();
@@ -169,7 +186,7 @@ public class PaxosServer {
         String id = null;
         try {
             InetAddress IP = InetAddress.getLocalHost();
-            id = IP.getHostAddress()+":"+String.valueOf(port);
+            id = ip != "" ? ip+":"+String.valueOf(port) : IP.getHostAddress()+":"+String.valueOf(port);
 
         } catch (UnknownHostException e) {
             // TODO Auto-generated catch block
@@ -184,6 +201,8 @@ public class PaxosServer {
             System.setProperty("java.util.logging.SimpleFormatter.format", "[%1$tF %1$tT : %1$tL] [%4$-7s] %5$s %n");
             int port = Integer.parseInt(args[0]);
             String postgresPort = args[1];
+            if (args.length > 3)
+                ip = args[3];
             PaxosServer paxosServer = new PaxosServer(createServerID(port), port, postgresPort, ServerBuilder.forPort(port));
 
             paxosServer.start();
@@ -259,7 +278,7 @@ public class PaxosServer {
         String[] data = currentServerID.split(":");
         String ip = data[0];
         int port = Integer.parseInt(data[1]);
-        return (discoveryNodeIPAddress.equals("localhost") || discoveryNodeIPAddress.equals("127.0.0.1") || discoveryNodeIPAddress.equals(ip))
+        return (discoveryNodeIPAddress.equals("localhost") || discoveryNodeIPAddress.equals("127.0.0.1") || discoveryNodeIPAddress.equals(ip) || discoveryNodeIPAddress.equals(PaxosServer.ip))
                 && discoveryNodePort == port;
     }
 

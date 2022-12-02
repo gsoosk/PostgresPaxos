@@ -1,0 +1,35 @@
+- name: Create target directory
+  file: 
+    path: postgres
+    state: directory 
+    mode: 0755
+
+- name: copy docker compose
+  copy:
+    src: docker-compose.yml
+    dest: ./postgres/docker-compose.yml
+
+- name: copy init file
+  copy:
+    src: init.sql
+    dest: ./postgres
+
+
+- name: Tear down existing services
+  community.docker.docker_compose:
+    project_src: ./postgres
+    state: absent
+  become: true
+
+- name: Prune volumes
+  community.docker.docker_prune:
+    volumes: true
+
+- name: Create and start services
+  community.docker.docker_compose:
+    project_src: ./postgres
+  register: output
+
+
+- ansible.builtin.debug:
+    var: output
