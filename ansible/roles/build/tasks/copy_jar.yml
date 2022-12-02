@@ -4,10 +4,6 @@
     state: directory
     mode: 0755
 
-- name: Copy config
-  copy:
-    src: /tmp/paxos/resources/
-    dest: ./paxos/resources/
 
 - name: copy file to remote
   copy:

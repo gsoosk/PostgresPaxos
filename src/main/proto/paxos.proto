@@ -44,6 +44,7 @@ message Partition {
 message Values {
     string partition_id = 1;
     map<string, string> values = 2;
+    int64 id = 3;
 }
 
 message Result {

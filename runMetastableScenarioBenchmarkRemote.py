@@ -1,14 +1,9 @@
-from http import client
 from pydoc import cli
 import subprocess
-import sys
 import time
 import os
 import shutil
 import signal
-import pexpect
-import paramiko
-
 servers = [
     {
         "address":"129.114.108.105",
@@ -40,13 +35,12 @@ client_address = "129.114.108.225"
 server_jar = "PaxosKV-server.jar"
 performance_jar = "PaxosKV-performance.jar"
 
-batch_siize_start =300000
-batch_size_end = 600000
-batch_size_step = 10000 
+batch_size =250000
 number_of_clients = 3
-benchmark_time = 60
+benchmark_time = 600
+trigger_time = 30
 result_folder = "./result"
-intervals = [300]
+interval = 300
 max_retry = 2
 
 dummy_interval = 300
@@ -75,14 +69,24 @@ def runBenchmark():
     subprocess.Popen(["ssh", f'cc@{client_address}', "sudo", "rm", "-rf", "~/paxos/result",]).wait()
     subprocess.Popen(["ssh", f'cc@{client_address}', "sudo", "mkdir", "~/paxos/result",]).wait()
 
-    for interval in intervals:
-        print(f"interval is {interval}")
-        for batch_size in range(batch_siize_start, batch_size_end, batch_size_step):
-            print(f"cleaning up previous run")
-            runClients(dummy_interval, dummy_batch_size, dummy=True)
-            time.sleep(10)
-            print(f"starting {number_of_clients} benchmark clients for batch size {batch_size}, interval: {interval}")
-            runClients(interval, batch_size)
+    print(f"interval is {interval}")
+    print(f"cleaning up previous run")
+    clients = runClients(dummy_interval, dummy_batch_size, dummy=True)
+    for p in clients:
+        p.wait()
+    time.sleep(10)
+
+    print(f"starting {number_of_clients} benchmark clients for batch size {batch_size}, interval: {interval}")
+    clients = runClients(interval, batch_size)
+
+    print(f'waiting for {trigger_time} seconds to trigger into metastable state')
+    time.sleep(trigger_time)
+
+    
+
+    for p in clients:
+        p.wait()
+
     
     subprocess.Popen(["scp", "-r", f'cc@{client_address}:~/paxos/result', "."]).wait
 
@@ -91,7 +95,12 @@ def runClients(interval, batch_size, dummy=False):
     for i in range(number_of_clients):
         result_file = f'~/paxos/result/result_partition{i + 1}.csv' if not dummy else f'/tmp/result_dummy{i + 1}.csv'
         time = str(benchmark_time) if not dummy else str(10)
-        client = subprocess.Popen(
+        client = runClient(interval, batch_size, i, result_file, time)
+        clients.append(client)
+    return clients
+
+def runClient(interval, batch_size, i, result_file, time):
+    client = subprocess.Popen(
                     [
                         "ssh", f'cc@{client_address}', "cd", "paxos", "&&", "sudo",
                         "java", "-jar", performance_jar,
@@ -108,9 +117,8 @@ def runClients(interval, batch_size, dummy=False):
                         "--max-retry", str(max_retry) 
                     ]
                 )
-        clients.append(client)
-    for p in clients:
-        p.wait()
+            
+    return client
 
 
 def killAllOpenProcesses():
@@ -118,6 +126,9 @@ def killAllOpenProcesses():
     subprocess.Popen(["ssh", f'cc@{client_address}', 'sudo', 'pkill', '--signal', 'SIGKILL',  'java']).wait()
     for server in servers:
         subprocess.Popen(["ssh", f'cc@{server["address"]}', 'sudo', 'pkill', '--signal', 'SIGKILL',  'java']).wait()
+
+def killAClient():
+    subprocess.Popen(["ssh", f'cc@{client_address}' ,"sudo  kill $(ps -ef | grep java | grep 8003 | awk '{print $2}')"])
 
 def exitHandler(signum, frame):
     killAllOpenProcesses()
