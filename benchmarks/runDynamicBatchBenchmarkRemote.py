@@ -11,42 +11,41 @@ import paramiko
 
 servers = [
     {
-        "address":"129.114.108.105",
-        "ip":"10.52.2.90",
+        "address":"129.114.109.177",
+        "ip":"10.52.3.170",
         "port": "8001",
         "postgres": "9000",
         "partition": "3"
     },
     {
-        "address":"129.114.109.112",
-        "ip":"10.52.2.124",
+        "address":"129.114.109.100",
+        "ip":"10.52.0.31",
         "port": "8002",
         "postgres": "9000",
         "partition": "2"
     },
     {
-        "address":"129.114.109.1", 
-        "ip":"10.52.3.62",
+        "address":"129.114.108.193",
+        "ip":"10.52.0.245",
         "port": "8003",
         "postgres": "9000",
         "partition": "1"
     }
 
 ]
-client_address = "129.114.108.225"
+client_address = "129.114.109.169"
 
 
 
 server_jar = "PaxosKV-server.jar"
 performance_jar = "PaxosKV-performance.jar"
 
-batch_siize_start =300000
-batch_size_end = 600000
-batch_size_step = 10000 
-number_of_clients = 3
-benchmark_time = 60
+# [(batch_size, time)]
+dynamic_batch_sizes = [(200000, 180), (220000, 180), (250000, 180), (300000, 180), (250000, 180), (220000, 180), (200000, 180), (150000, 180), (120000, 180), (100000, 180), (50000, 180), (10000, 180)]
+number_of_clients = 1
+benchmark_time = 2160
 result_folder = "./result"
-intervals = [300]
+interval = 300
 max_retry = 2
 
 dummy_interval = 300
@@ -75,14 +74,18 @@ def runBenchmark():
     subprocess.Popen(["ssh", f'cc@{client_address}', "sudo", "rm", "-rf", "~/paxos/result",]).wait()
     subprocess.Popen(["ssh", f'cc@{client_address}', "sudo", "mkdir", "~/paxos/result",]).wait()
 
-    for interval in intervals:
-        print(f"interval is {interval}")
-        for batch_size in range(batch_siize_start, batch_size_end, batch_size_step):
-            print(f"cleaning up previous run")
-            runClients(dummy_interval, dummy_batch_size, dummy=True)
-            time.sleep(10)
-            print(f"starting {number_of_clients} benchmark clients for batch size {batch_size}, interval: {interval}")
-            runClients(interval, batch_size)
+    print(f"interval is {interval}")
+    dynamic_inputs = []
+    for batch_size in dynamic_batch_sizes:
+        dynamic_inputs += ["--dynamic-batch-size", str(batch_size[0])]
+        dynamic_inputs += ["--dynamic-batch-time", str(batch_size[1])]
+
+
+    print(f"cleaning up previous run")
+    runClients(dummy_interval, dummy_batch_size, dummy=True)
+    time.sleep(10)
+    print(f"starting {number_of_clients} benchmark clients for batch size {batch_size}, interval: {interval}")
+    runClients(interval, dynamic_inputs)
     
     subprocess.Popen(["scp", "-r", f'cc@{client_address}:~/paxos/result', "."]).wait
 
@@ -90,9 +93,9 @@ def runClients(interval, batch_size, dummy=False):
     clients = []
     for i in range(number_of_clients):
         result_file = f'~/paxos/result/result_partition{i + 1}.csv' if not dummy else f'/tmp/result_dummy{i + 1}.csv'
+        metric_file = f'~/paxos/result/metrics_partition{i + 1}.csv' if not dummy else f'/tmp/result_dummy{i + 1}.csv' 
         time = str(benchmark_time) if not dummy else str(10)
-        client = subprocess.Popen(
-                    [
+        process = [
                         "ssh", f'cc@{client_address}', "cd", "paxos", "&&", "sudo",
                         "java", "-jar", performance_jar,
                         "--address", servers[i]['ip'],
@@ -101,13 +104,18 @@ def runClients(interval, batch_size, dummy=False):
                         "--throughput", "-1",
                         "--record-size", "255",
                         "--partition-id", str(i + 1),
-                        "--batch-size", str(batch_size),
                         "--interval", str(interval),
-                        "--timeout", str(700), 
+                        "--timeout", str(600), 
                         "--result-file", result_file,
-                        "--max-retry", str(max_retry) 
+                        "--metric-file", f'~/paxos/result/metrics_partition{i + 1}.csv',
+                        "--max-retry", str(max_retry)
                     ]
-                )
+        if dummy:
+            process += ["--batch-size", str(batch_size)]
+        else: 
+            process += batch_size
+
+        client = subprocess.Popen(process)
         clients.append(client)
     for p in clients:
         p.wait()
@@ -130,5 +138,3 @@ all_servers_process = runServers()
 time.sleep(5)
 runBenchmark()
 killAllOpenProcesses()
-# for p in all_servers_process:
-#     p.kill()
