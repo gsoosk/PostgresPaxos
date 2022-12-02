@@ -132,7 +132,9 @@ public class Performance {
 
             connectToDataStore();
             logger.info("Running benchmark for partition: " + partitionId);
+            logger.info("Cleaning previous database...");
             datastore.clear(Partition.newBuilder().setPartitionId(partitionId).build());
+            Thread.sleep(1000);
 
             int batched = 0;
             int data = 0;
@@ -322,6 +324,7 @@ public class Performance {
             @Override
             public void onCompleted() {
                 logger.info("retry complete");
+                stats.completeRetry();
                 sent.set(0, sent.get(0)-1);
                 long end = System.currentTimeMillis();
                 for (int i = 0; i < toRetryStart.size() ; i++) {
@@ -583,6 +586,10 @@ public class Performance {
         private int interval;
         private int timeout;
         private Map<Long, Integer> retries;
+        private int previousWindowRequestRetried;
+        private int previousWindowRetries;
+        private int completedRetries;
+        private int previousWindowCompletedRetries;
 
         private String metricsFilePath;
         private int started;
@@ -606,6 +613,10 @@ public class Performance {
             this.windowTotalLatency = 0;
             this.windowBytes = 0;
             this.totalLatency = 0;
+            this.previousWindowRequestRetried = 0;
+            this.previousWindowRetries = 0;
+            this.completedRetries = 0;
+            this.previousWindowCompletedRetries = 0;
             this.reportingInterval = reportingInterval;
             this.resultFilePath = resultFilePath;
             this.metricsFilePath = metricsFilePath;
@@ -620,7 +631,7 @@ public class Performance {
 
         private void createResultCSVFiles(String resultFilePath, String metricFilePath) {
             if (!Files.exists(Paths.get(resultFilePath))){
-                String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, goodput, average latency, max latency, 50th latency, 95th latency, requests retried, retries\n";
+                String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, goodput, average latency, max latency, 50th latency, 95th latency, requests retried, retries, completed retries\n";
                 try {
                     BufferedWriter out = new BufferedWriter(
                             new FileWriter(resultFilePath, true));
@@ -635,7 +646,7 @@ public class Performance {
                 }
             }
 
-            String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, goodput, average latency, max latency, requests retried, retries\n";
+            String CSVHeader = "num of records, record size, interval, timeout, batch size, throughput, goodput, average latency, max latency, requests retried, retries, completed retries\n";
             try {
                 BufferedWriter out = new BufferedWriter(
                         new FileWriter(metricFilePath, false));
@@ -709,7 +720,9 @@ public class Performance {
                     windowTotalLatency / (double) windowCount,
                     (double) windowMaxLatency));
 
-            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.3f,%.2f,%.2f,%d,%d\n",
+
+
+            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.3f,%.2f,%.2f,%d,%d,%d\n",
                     count,
                     recordSize,
                     interval,
@@ -719,8 +732,10 @@ public class Performance {
                     mbPerSec,
                     windowTotalLatency / (double) windowCount,
                     (double) maxLatency,
-                    retries.size(),
-                    retries.values().stream().mapToInt(Integer::intValue).sum());
+                    retries.size() - previousWindowRetries,
+                    retries.values().stream().mapToInt(Integer::intValue).sum() - previousWindowRequestRetried,
+                    completedRetries - previousWindowCompletedRetries);
+
             try {
                 BufferedWriter out = new BufferedWriter(
                         new FileWriter(metricsFilePath, true));
@@ -742,6 +757,9 @@ public class Performance {
             this.windowTotalLatency = 0;
             this.windowBytes = 0;
             this.startedWindowBytes = 0;
+            previousWindowRetries = retries.size();
+            previousWindowRequestRetried = retries.values().stream().mapToInt(Integer::intValue).sum();
+            previousWindowCompletedRetries = completedRetries;
         }
 
         public void printTotal() {
@@ -764,7 +782,7 @@ public class Performance {
                     retries.size(),
                     retries.values().stream().mapToInt(Integer::intValue).sum()));
 
-            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.3f,%.2f,%.2f,%d,%d,%d,%d\n",
+            String resultCSV = String.format("%d,%d,%d,%d,%d,%.3f,%.3f,%.2f,%.2f,%d,%d,%d,%d,%d\n",
                     count,
                     recordSize,
                     interval,
@@ -777,7 +795,8 @@ public class Performance {
                     percs[0],
                     percs[1],
                     retries.size(),
-                    retries.values().stream().mapToInt(Integer::intValue).sum());
+                    retries.values().stream().mapToInt(Integer::intValue).sum(),
+                    completedRetries);
             try {
                 BufferedWriter out = new BufferedWriter(
                         new FileWriter(resultFilePath, true));
@@ -817,6 +836,10 @@ public class Performance {
 
         public void updateBatchSize(Integer batchSize) {
             this.batchSize = batchSize;
+        }
+
+        public void completeRetry() {
+            completedRetries ++;
         }
     }
 
