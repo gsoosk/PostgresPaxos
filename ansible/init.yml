@@ -18,4 +18,7 @@
   tasks:
     - include_role:
         name: common
+        tasks_from: install_docker.yml
+    - include_role:
+        name: common
         tasks_from: install_java.yml
