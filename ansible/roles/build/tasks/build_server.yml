@@ -1,8 +1,3 @@
-
-- name:
-  debug:
-    msg: "{{groups['server1'][0]}}:{{hostvars[ groups['server1'][0] ]['port']}},{{groups['server2'][0]}}:{{hostvars[ groups['server2'][0] ]['port']}},{{groups['server3'][0]}}:{{hostvars[ groups['server3'][0] ]['port']}}"
-
 - name: copy source
   copy:
     src: ../../../src/

@@ -12,7 +12,7 @@
 
 - name: copy
   copy:
-    content: "discovery.nodes={{hostvars[ groups['server1'][0] ]['discovery_ip']}}:{{hostvars[ groups['server1'][0] ]['port']}},{{hostvars[ groups['server2'][0] ]['discovery_ip']}}:{{hostvars[ groups['server2'][0] ]['port']}},{{hostvars[ groups['server3'][0] ]['discovery_ip']}}:{{hostvars[ groups['server3'][0] ]['port']}}\ndiscovery.self={{hostvars[inventory_hostname]['discovery_ip']}}\njava.util.logging.SimpleFormatter.format=[%1$tF %1$tT] [%4$-7s] %5$s %n"
+    content: "discovery.nodes={{hostvars[ groups['servers'][0] ]['discovery_ip']}}:{{hostvars[ groups['servers'][0] ]['port']}},{{hostvars[ groups['servers'][1] ]['discovery_ip']}}:{{hostvars[ groups['servers'][1] ]['port']}},{{hostvars[ groups['servers'][2] ]['discovery_ip']}}:{{hostvars[ groups['servers'][2] ]['port']}}\ndiscovery.self={{discovery_ip}}\njava.util.logging.SimpleFormatter.format=[%1$tF %1$tT] [%4$-7s] %5$s %n"
     dest: ./paxos/resources/config.properties
 
 - name: copy file to remote

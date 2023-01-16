@@ -1,9 +1,7 @@
 ---
 - name: Install Requirements (Java, Docker) on servers
   hosts:
-    - server1
-    - server2
-    - server3
+    - servers
   become: yes
   tasks:
     - include_role:
