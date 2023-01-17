@@ -31,3 +31,10 @@ all:
         129.114.108.121:
           ansible_user: "cc"
           ansible_connection: ssh
+          discovery_ip: 10.52.2.120
+
+    prometheus:
+      hosts:
+        129.114.108.189:
+          ansible_user: "cc"
+          ansible_connection: ssh
