@@ -1,0 +1,37 @@
+- name: add client configuration
+  blockinfile:
+    path: metrics/prometheus/prometheus.yml
+    block: "{{ lookup('template', 'templates/scrape_config_block.j2') }}"
+    marker: "# client configuration"
+  vars:
+    url: "{{ groups['client'][0] }}"
+    node_name: "client"
+
+- name: add server1 configuration
+  blockinfile:
+    path: metrics/prometheus/prometheus.yml
+    block: "{{ lookup('template', 'templates/scrape_config_block.j2') }}"
+    marker: "# server1 configuration"
+  vars:
+    url: "{{  groups['servers'][0] }}"
+    node_name: "server1"
+
+- name: add server2 configuration
+  blockinfile:
+    path: metrics/prometheus/prometheus.yml
+    block: "{{ lookup('template', 'templates/scrape_config_block.j2') }}"
+    marker: "# server2 configuration"
+  vars:
+    url: "{{ groups['servers'][1] }}"
+    node_name: "server2"
+
+
+- name: add server3 configuration
+  blockinfile:
+    path: metrics/prometheus/prometheus.yml
+    block: "{{ lookup('template', 'templates/scrape_config_block.j2') }}"
+    marker: "# server3 configuration"
+  vars:
+    url: "{{  groups['servers'][2] }}"
+    node_name: "server3"
+

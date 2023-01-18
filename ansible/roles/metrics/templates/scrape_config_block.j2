@@ -1,0 +1,23 @@
+  - job_name: "node-exporter-{{ node_name }}"
+
+    scrape_interval: 500ms
+
+    proxy_url: "http://{{ url }}"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: [ "node-exporter.local" ]
+        labels:
+          application: "node-exporter"
+          node: "{{ node_name }}"
+
+  - job_name: "cadvisor-{{ node_name }}"
+
+    scrape_interval: 500ms
+
+    proxy_url: "http://{{ url }}"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: [ "cadvisor.local" ]
+        labels:
+          application: "cadvisor"
+          node: "{{ node_name }}"

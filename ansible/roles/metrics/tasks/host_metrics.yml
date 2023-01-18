@@ -1,0 +1,30 @@
+- name: Create target directory
+  file:
+    path: host-metrics
+    state: directory
+    mode: 0755
+
+- name: copy docker compose using template
+  copy:
+    src: host-metrics.yml
+    dest: ./host-metrics/docker-compose.yml
+    mode: 0644
+
+
+- name: Tear down existing services
+  community.docker.docker_compose:
+    project_src: ./host-metrics
+    state: absent
+  become: true
+
+- name: Prune volumes
+  community.docker.docker_prune:
+    volumes: true
+
+- name: Create and start services
+  community.docker.docker_compose:
+    project_src: ./host-metrics
+  register: output
+
+- ansible.builtin.debug:
+    var: output

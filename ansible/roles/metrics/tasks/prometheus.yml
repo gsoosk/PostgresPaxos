@@ -1,0 +1,41 @@
+- name: Create target directory
+  file:
+    path: metrics
+    state: directory
+    mode: 0755
+
+
+- name: Create config directory
+  file:
+    path: metrics/prometheus
+    state: directory
+    mode: 0755
+
+
+- name: copy docker compose using template
+  copy:
+    src: prometheus.yml
+    dest: ./metrics/docker-compose.yml
+
+- name: copy config file
+  copy:
+    src: prometheus/prometheus.yml
+    dest: ./metrics/prometheus/prometheus.yml
+
+- name: add metric configurations
+  include_tasks: metrics_configuration.yml
+
+
+- name: Tear down existing services
+  community.docker.docker_compose:
+    project_src: ./metrics
+    state: absent
+  become: true
+
+- name: Create and start services
+  community.docker.docker_compose:
+    project_src: ./metrics
+  register: output
+
+- ansible.builtin.debug:
+    var: output
