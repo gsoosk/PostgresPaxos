@@ -23,9 +23,10 @@ import java.util.logging.SimpleFormatter;
 import com.*;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
-import io.prometheus.client.CollectorRegistry;
-import io.prometheus.client.Histogram;
+import io.prometheus.client.*;
+import io.prometheus.client.exporter.HTTPServer;
 import io.prometheus.client.exporter.PushGateway;
+import io.prometheus.client.hotspot.DefaultExports;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -38,15 +39,19 @@ public class Performance {
 
     private static final Integer INFINITY = -1;
 
-    private CollectorRegistry metricRegistry;
     private Namespace res;
 
     public static void main(String[] args) throws Exception{
         Performance perf = new Performance();
         try {
             perf.parseArguments(args);
+            DefaultExports.initialize(); // export jvm
+            HTTPServer server = new HTTPServer.Builder()
+                    .withPort(7000)
+                    .build();
+
             perf.start();
-            perf.pushMetrics();
+            server.close();
         } catch (ArgumentParserException ignored) {
         }
 
@@ -66,19 +71,6 @@ public class Performance {
         }
     }
 
-    private void pushMetrics() {
-        PushGateway pg = new PushGateway("127.0.0.1:9091");
-        try {
-            pg.pushAdd(CollectorRegistry.defaultRegistry, "paxos_performance_job");
-        } catch (IOException e) {
-            e.printStackTrace();
-            logger.info("could not push metrics: " + e.getMessage());
-        }
-    }
-
-    public Performance() {
-        this.metricRegistry = new CollectorRegistry();
-    }
 
     private String address;
     private int port;
@@ -624,9 +616,43 @@ public class Performance {
         private int startedWindowBytes;
 
         // Metrics
-        private static final Histogram finishedRequestsBytes = Histogram.build()
+        private static final Summary finishedRequestsBytes = Summary.build()
                 .name("paxos_requests_finished_bytes")
                 .help("size of requests that finished")
+                .register();
+        private static final Summary addedRequestsBytes = Summary.build()
+                .name("paxos_requests_sent_bytes")
+                .help("size of requests sent to the leader")
+                .register();
+        private static final Gauge batchSizeGauge = Gauge.build()
+                .name("paxos_batch_size")
+                .help("Batch size")
+                .register();
+        private static final Gauge intervalGauge = Gauge.build()
+                .name("paxos_interval_total")
+                .help("Interval between requests")
+                .register();
+        private static final Gauge timeoutGauge = Gauge.build()
+                .name("paxos_timeout_total")
+                .help("timeout of a request")
+                .register();
+        private static final Summary finishedRequestsLatency = Summary.build()
+                .name("paxos_requests_finished_latency")
+                .help("Latency of requests responded")
+                .quantile(0.5, 0.001)    // 0.5 quantile (median) with 0.01 allowed error
+                .quantile(0.95, 0.005)  // 0.95 quantile with 0.005 allowed error
+                .register();
+        private static final Counter requestRetried = Counter.build()
+                .name("paxos_requests_retired_total")
+                .help("Number of requests that retried")
+                .register();
+        private static final Counter allRetries = Counter.build()
+                .name("paxos_request_retries_total")
+                .help("Number of request retries")
+                .register();
+        private static final Counter retriesCompleted = Counter.build()
+                .name("paxos_request_retry_completed_total")
+                .help("Number of retries that has been compelted")
                 .register();
 
         public Stats(long numRecords, int reportingInterval, String resultFilePath, String metricsFilePath, int recordSize, int batchSize, int interval, int timeout) {
@@ -656,8 +682,11 @@ public class Performance {
             this.numRecords = numRecords;
             this.recordSize = recordSize;
             this.batchSize = batchSize;
+            batchSizeGauge.set(batchSize);
             this.interval = interval;
+            intervalGauge.set(interval);
             this.timeout = timeout;
+            timeoutGauge.set(timeout);
             this.retries = new HashMap<>();
             createResultCSVFiles(resultFilePath, metricsFilePath);
         }
@@ -698,6 +727,7 @@ public class Performance {
             this.count++;
             this.bytes += bytes;
             finishedRequestsBytes.observe(bytes);
+            finishedRequestsLatency.observe((double) latency/1000);
             this.totalLatency += latency;
             this.maxLatency = Math.max(this.maxLatency, latency);
             this.windowCount++;
@@ -712,7 +742,6 @@ public class Performance {
         }
 
         private void report(long time) {
-            /* maybe report the recent perf */
             if (time - windowStart >= reportingInterval) {
                 printWindow();
                 newWindow();
@@ -729,6 +758,7 @@ public class Performance {
         public synchronized void nextAdded(int bytes) {
             long now = System.currentTimeMillis();
             this.started++;
+            addedRequestsBytes.observe(bytes);
             this.startedBytes += bytes;
             this.startedWindowBytes += bytes;
 
@@ -858,10 +888,13 @@ public class Performance {
         }
 
         public void addRetry(long c) {
+            allRetries.inc();
             if (retries.containsKey(c))
                 retries.put(c, retries.get(c) + 1);
-            else
+            else {
                 retries.put(c, 1);
+                requestRetried.inc();
+            }
         }
 
         public Integer getNumberOfRetries(long c) {
@@ -870,9 +903,11 @@ public class Performance {
 
         public void updateBatchSize(Integer batchSize) {
             this.batchSize = batchSize;
+            batchSizeGauge.set(batchSize);
         }
 
         public void completeRetry() {
+            retriesCompleted.inc();
             completedRetries ++;
         }
     }

@@ -26,10 +26,9 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
 #    links:
-    #      - pushgateway:pushgateway
+#        - pushgateway:pushgateway
 #    depends_on:
-#      - cadvisor
-    #      - pushgateway
+#      - pushgateway
     networks:
       - back-tier
     restart: always
@@ -51,13 +50,11 @@ services:
       - back-tier
       - front-tier
     restart: always
-
+#
 #  pushgateway:
 #    image: prom/pushgateway
 #    restart: always
-#    expose:
-#      - 9091
 #    ports:
-#      - "9091:9091"
+#      - "443:9091"
 #    networks:
 #      - back-tier
