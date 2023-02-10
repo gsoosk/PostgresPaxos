@@ -6,6 +6,8 @@
   vars:
     url: "{{ groups['client'][0] }}"
     node_name: "client"
+    target_address: "{{ hostvars[ groups['client'][0] ]['discovery_ip'] }}"
+    target_port: "7000"
 
 - name: add server1 configuration
   blockinfile:
@@ -15,6 +17,8 @@
   vars:
     url: "{{  groups['servers'][0] }}"
     node_name: "server1"
+    target_address: "{{ hostvars[ groups['servers'][0] ]['discovery_ip'] }}"
+    target_port: "7000"
 
 - name: add server2 configuration
   blockinfile:
@@ -24,6 +28,8 @@
   vars:
     url: "{{ groups['servers'][1] }}"
     node_name: "server2"
+    target_address: "{{ hostvars[ groups['servers'][1] ]['discovery_ip'] }}"
+    target_port: "7000"
 
 
 - name: add server3 configuration
@@ -34,15 +40,17 @@
   vars:
     url: "{{  groups['servers'][2] }}"
     node_name: "server3"
-
-
-- name: add paxos configuration
-  blockinfile:
-    path: metrics/prometheus/prometheus.yml
-    block: "{{ lookup('template', 'templates/benchmark_scrape_config_block.j2') }}"
-    marker: "# paxos configuration"
-  vars:
-    target_address: "{{ hostvars[ groups['client'][0] ]['discovery_ip'] }}"
+    target_address: "{{ hostvars[ groups['servers'][2] ]['discovery_ip'] }}"
     target_port: "7000"
-    node_name: "client"
+
+
+#- name: add paxos configuration
+#  blockinfile:
+#    path: metrics/prometheus/prometheus.yml
+#    block: "{{ lookup('template', 'templates/benchmark_scrape_config_block.j2') }}"
+#    marker: "# paxos configuration"
+#  vars:
+#    target_address: "{{ hostvars[ groups['client'][0] ]['discovery_ip'] }}"
+#    target_port: "7000"
+#    node_name: "client"
 

@@ -161,7 +161,7 @@ public class Performance {
         logger.info("Running benchmark for partition: " + partitionId);
         logger.info("Cleaning previous database...");
         datastore.clear(Partition.newBuilder().setPartitionId(partitionId).build());
-        Thread.sleep(1000);
+        Thread.sleep(10000);
 
         int batched = 0;
         int data = 0;

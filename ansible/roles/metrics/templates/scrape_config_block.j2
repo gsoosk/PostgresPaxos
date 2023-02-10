@@ -21,3 +21,14 @@
         labels:
           application: "cadvisor "
           node: "{{ node_name }}"
+
+  - job_name: "paxos-{{ node_name }}"
+
+    scrape_interval: 500ms
+    scrape_timeout: 400ms
+
+    static_configs:
+      - targets: [ "{{ target_address }}:{{ target_port }}" ]
+        labels:
+          application: "paxos"
+          node: "{{ node_name }}"
