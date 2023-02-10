@@ -1,0 +1,10 @@
+  - job_name: "benchmark"
+
+    scrape_interval: 500ms
+    scrape_timeout: 400ms
+
+    static_configs:
+      - targets: [ "{{ target_address }}:{{ target_port }}" ]
+        labels:
+          application: "paxos"
+          node: "{{ node_name }}"

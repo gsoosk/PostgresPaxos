@@ -2,6 +2,8 @@ package com;
 
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
+import io.prometheus.client.exporter.HTTPServer;
+import io.prometheus.client.hotspot.DefaultExports;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -209,6 +211,11 @@ public class PaxosServer {
             String currentServerID = createServerID(port);
             String[] discoveryNodes = prop.getProperty("discovery.nodes").split(",");
 
+            DefaultExports.initialize(); // export jvm
+            HTTPServer metricServer = new HTTPServer.Builder()
+                    .withPort(7000)
+                    .build();
+
 
             PaxosServer paxosServer = new PaxosServer(createServerID(port), port, postgresPort, ServerBuilder.forPort(port));
 
@@ -251,6 +258,7 @@ public class PaxosServer {
 
             channelToSelf.shutdown();
             paxosServer.blockUntilShutdown();
+            metricServer.close();
 
 
 		}

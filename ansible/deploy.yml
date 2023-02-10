@@ -2,9 +2,7 @@
 ---
 - name: Run postgres
   hosts:
-    - server1
-    - server2
-    - server3
+    - servers
   become: yes
   tasks:
     - include_role:
@@ -21,9 +19,7 @@
 
 - name: Copy jar to servers
   hosts:
-    - server1
-    - server2
-    - server3
+    - servers
   become: yes
 
   tasks:

@@ -1,0 +1,33 @@
+- name: Create target directory
+  file:
+    path: reverse-proxy
+    state: directory
+    mode: 0755
+
+- name: Create a network for docker containers
+  docker_network:
+    name: nginx
+
+- name: copy docker compose using template
+  copy:
+    src: nginx.yml
+    dest: ./reverse-proxy/docker-compose.yml
+
+
+- name: Tear down existing services
+  community.docker.docker_compose:
+    project_src: ./reverse-proxy
+    state: absent
+  become: true
+
+- name: Prune volumes
+  community.docker.docker_prune:
+    volumes: true
+
+- name: Create and start services
+  community.docker.docker_compose:
+    project_src: ./reverse-proxy
+  register: output
+
+- ansible.builtin.debug:
+    var: output

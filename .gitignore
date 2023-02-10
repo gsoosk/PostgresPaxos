@@ -6,7 +6,7 @@ result.csv
 metrics.csv
 result/
 metric/
-metric*
+#metric*
 result*
 rerun.sh
 allResults/

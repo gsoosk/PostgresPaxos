@@ -23,6 +23,10 @@ import java.util.logging.SimpleFormatter;
 import com.*;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
+import io.prometheus.client.*;
+import io.prometheus.client.exporter.HTTPServer;
+import io.prometheus.client.exporter.PushGateway;
+import io.prometheus.client.hotspot.DefaultExports;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -35,10 +39,38 @@ public class Performance {
 
     private static final Integer INFINITY = -1;
 
-    public static void main(String[] args) throws Exception {
+    private Namespace res;
+
+    public static void main(String[] args) throws Exception{
         Performance perf = new Performance();
-        perf.start(args);
+        try {
+            perf.parseArguments(args);
+            DefaultExports.initialize(); // export jvm
+            HTTPServer server = new HTTPServer.Builder()
+                    .withPort(7000)
+                    .build();
+
+            perf.start();
+            server.close();
+        } catch (ArgumentParserException ignored) {
+        }
+
     }
+
+    private void parseArguments(String[] args) throws ArgumentParserException {
+        ArgumentParser parser = argParser();
+        try {
+            res = parser.parseArgs(args);
+        } catch (ArgumentParserException e) {
+            if (args.length == 0) {
+                parser.printHelp();
+            } else {
+                parser.handleError(e);
+            }
+           throw e;
+        }
+    }
+
 
     private String address;
     private int port;
@@ -78,230 +110,217 @@ public class Performance {
         return logger;
     }
 
-    void start(String[] args) throws Exception {
-        ArgumentParser parser = argParser();
+    void start() throws Exception {
+        /* parse args */
+        address = res.getString("address");
+        port = res.getInt("port");
 
-        try {
-            Namespace res = parser.parseArgs(args);
+        Integer batchSize = res.getInt("batchSize");
 
-            /* parse args */
-            address = res.getString("address");
-            port = res.getInt("port");
+        List<Integer> dynamicBatchSize = res.getList("dynamicBatchSize");
+        List<Integer> dynamicBatchTimes = res.getList("dynamicBatchTime");
+        int currentBatchIndex = 0;
+        boolean dynamicBatching = false;
+        if (dynamicBatchSize != null && dynamicBatchTimes != null ) {
+            if (dynamicBatchSize.size() != dynamicBatchTimes.size())
+                throw new Exception("number of dynamic batch times and batch sizes should be equal");
+            batchSize = dynamicBatchSize.get(currentBatchIndex);
+            dynamicBatching = true;
+        }
+        Integer recordSize = res.getInt("recordSize");
+        long warmup = batchSize != null ? (batchSize / recordSize) * 4L : 100;
+        long numRecords = res.getLong("numRecords") == null ? Integer.MAX_VALUE - warmup - 2 : res.getLong("numRecords");
+        numRecords += warmup;
+        int throughput = res.getInt("throughput");
+        String payloadFilePath = res.getString("payloadFile");
+        String resultFilePath = res.getString("resultFile") == null ? "result.csv" : res.getString("resultFile") ;
+        String metricsFilePath = res.getString("metricsFile") == null ? "metrics.csv" : res.getString("metricsFile") ;
+        String partitionId = res.getString("partitionId");
+        // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
+        String payloadDelimiter = res.getString("payloadDelimiter").equals("\\n") ? "\n" : res.getString("payloadDelimiter");
+        Long benchmarkTime = res.getLong("benchmarkTime");
+        Integer interval = res.getInt("interval");
+        Integer timeout = res.getInt("timeout") != null ? res.getInt("timeout") : interval * 2;
+        Integer maxRetry = res.getInt("maxRetry");
 
-            Integer batchSize = res.getInt("batchSize");
-
-            List<Integer> dynamicBatchSize = res.getList("dynamicBatchSize");
-            List<Integer> dynamicBatchTimes = res.getList("dynamicBatchTime");
-            int currentBatchIndex = 0;
-            boolean dynamicBatching = false;
-            if (dynamicBatchSize != null && dynamicBatchTimes != null ) {
-                if (dynamicBatchSize.size() != dynamicBatchTimes.size())
-                    throw new Exception("number of dynamic batch times and batch sizes should be equal");
-                batchSize = dynamicBatchSize.get(currentBatchIndex);
-                dynamicBatching = true;
-            }
-            Integer recordSize = res.getInt("recordSize");
-            long warmup = batchSize != null ? (batchSize / recordSize) * 4L : 100;
-            long numRecords = res.getLong("numRecords") == null ? Integer.MAX_VALUE - warmup - 2 : res.getLong("numRecords");
-            numRecords += warmup;
-            int throughput = res.getInt("throughput");
-            String payloadFilePath = res.getString("payloadFile");
-            String resultFilePath = res.getString("resultFile") == null ? "result.csv" : res.getString("resultFile") ;
-            String metricsFilePath = res.getString("metricsFile") == null ? "metrics.csv" : res.getString("metricsFile") ;
-            String partitionId = res.getString("partitionId");
-            // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
-            String payloadDelimiter = res.getString("payloadDelimiter").equals("\\n") ? "\n" : res.getString("payloadDelimiter");
-            Long benchmarkTime = res.getLong("benchmarkTime");
-            Integer interval = res.getInt("interval");
-            Integer timeout = res.getInt("timeout") != null ? res.getInt("timeout") : interval * 2;
-            Integer maxRetry = res.getInt("maxRetry");
-
-            List<byte[]> payloadByteList = readPayloadFile(payloadFilePath, payloadDelimiter);
+        List<byte[]> payloadByteList = readPayloadFile(payloadFilePath, payloadDelimiter);
 
 
-            /* setup perf test */
-            byte[] payload = null;
-            if (recordSize != null) {
-                payload = new byte[recordSize];
-            }
-            Random random = new Random(0);
-            Stats stats = new Stats(numRecords, 2000, resultFilePath, metricsFilePath, recordSize, batchSize, interval, timeout);
-            long startMs = System.currentTimeMillis();
+        /* setup perf test */
+        byte[] payload = null;
+        if (recordSize != null) {
+            payload = new byte[recordSize];
+        }
+        Random random = new Random(0);
+        Stats stats = new Stats(numRecords, 1000, resultFilePath, metricsFilePath, recordSize, batchSize, interval, timeout);
+        long startMs = System.currentTimeMillis();
 
-            ThroughputThrottler throttler = new ThroughputThrottler(throughput, startMs);
+        ThroughputThrottler throttler = new ThroughputThrottler(throughput, startMs);
 
-            connectToDataStore();
-            logger.info("Running benchmark for partition: " + partitionId);
-            logger.info("Cleaning previous database...");
-            datastore.clear(Partition.newBuilder().setPartitionId(partitionId).build());
-            Thread.sleep(1000);
+        connectToDataStore();
+        logger.info("Running benchmark for partition: " + partitionId);
+        logger.info("Cleaning previous database...");
+        datastore.clear(Partition.newBuilder().setPartitionId(partitionId).build());
+        Thread.sleep(10000);
 
-            int batched = 0;
-            int data = 0;
-            Map<String, String> values = new HashMap<>();
-            List<Long> starts = new ArrayList<>();
+        int batched = 0;
+        int data = 0;
+        Map<String, String> values = new HashMap<>();
+        List<Long> starts = new ArrayList<>();
 
-            List<Values> retries = Collections.synchronizedList(new ArrayList<>());
-            List<List<Long>> retryStarts = Collections.synchronizedList(new ArrayList<>());
-            List<Integer> sent = Collections.synchronizedList(new ArrayList<>());
+        List<Values> retries = Collections.synchronizedList(new ArrayList<>());
+        List<List<Long>> retryStarts = Collections.synchronizedList(new ArrayList<>());
+        List<Integer> sent = Collections.synchronizedList(new ArrayList<>());
 //            HashMap<Integer, Integer>  numOfRetries = new HashMap<>();
-            sent.add(0);
-            sent.add(0);
+        sent.add(0);
+        sent.add(0);
 
-            long requestsId = 0;
+        long requestsId = 0;
 
-            boolean batching = batchSize != null;
-            long sendingStart = System.currentTimeMillis();
-            long lastDynamicBatchCheckpoint = System.currentTimeMillis();
+        boolean batching = batchSize != null;
+        long sendingStart = System.currentTimeMillis();
+        long lastDynamicBatchCheckpoint = System.currentTimeMillis();
 //            TODO: Refactor this function
-            for (long i = 0; i < numRecords; i++) {
-                payload = generateRandomPayload(recordSize, payloadByteList, payload, random);
+        for (long i = 0; i < numRecords; i++) {
+            payload = generateRandomPayload(recordSize, payloadByteList, payload, random);
 
-                String record =  new String(payload, StandardCharsets.UTF_8);
-                long sendStartMs = System.currentTimeMillis();
+            String record =  new String(payload, StandardCharsets.UTF_8);
+            long sendStartMs = System.currentTimeMillis();
 
-                if (!batching) {
-                    stats.nextAdded(payload.length);
-                    datastore.put(Data.newBuilder()
-                            .setKey("test_" + i)
-                            .setValue(record)
+            if (!batching) {
+                stats.nextAdded(payload.length);
+                datastore.put(Data.newBuilder()
+                        .setKey("test_" + i)
+                        .setValue(record)
+                        .setPartitionId(partitionId)
+                        .build());
+                if (warmup < i)
+                    stats.nextCompletion(sendStartMs, payload.length);
+            }
+            else {
+                stats.report(System.currentTimeMillis());
+                if (batched < batchSize) {
+                    values.put("test_" + partitionId + "_" + data, record);
+                    data++;
+                    batched += record.length();
+                    starts.add(System.currentTimeMillis());
+                }
+                if (batched >= batchSize) {
+                    Values request = Values.newBuilder()
+                            .putAllValues(values)
                             .setPartitionId(partitionId)
-                            .build());
-                    if (warmup < i)
-                        stats.nextCompletion(sendStartMs, payload.length);
-                }
-                else {
-                    stats.report(System.currentTimeMillis());
-                    if (batched < batchSize) {
-                        values.put("test_" + partitionId + "_" + data, record);
-                        data++;
-                        batched += record.length();
-                        starts.add(System.currentTimeMillis());
-                    }
-                    if (batched >= batchSize) {
-                        Values request = Values.newBuilder()
-                                .putAllValues(values)
-                                .setPartitionId(partitionId)
-                                .setId(++requestsId)
-                                .build();
-                        long c = i;
-                        List<Long> copyStarts = new ArrayList<>(starts);
-                        if (interval == -1) {
-                            stats.nextAdded((recordSize + 5) * request.getValuesMap().size());
-                            datastore.batch(request);
-                            long end = System.currentTimeMillis();
-                            for (int j = 0 ; j < starts.size() ; j++) {
-                                if (i + j > warmup)
-                                    stats.nextCompletion(starts.get(j), end, payload.length + 5);
-                            }
+                            .setId(++requestsId)
+                            .build();
+                    long c = i;
+                    List<Long> copyStarts = new ArrayList<>(starts);
+                    if (interval == -1) {
+                        stats.nextAdded((recordSize + 5) * request.getValuesMap().size());
+                        datastore.batch(request);
+                        long end = System.currentTimeMillis();
+                        for (int j = 0 ; j < starts.size() ; j++) {
+                            if (i + j > warmup)
+                                stats.nextCompletion(starts.get(j), end, payload.length + 5);
                         }
-                        else {
+                    }
+                    else {
 
-                            StreamObserver<Result> observer = new StreamObserver<>() {
-                                @Override
-                                public void onNext(Result result) {
-                                }
+                        StreamObserver<Result> observer = new StreamObserver<>() {
+                            @Override
+                            public void onNext(Result result) {
+                            }
 
-                                @Override
-                                public void onError(Throwable throwable) {
-                                    retries.add(request);
-                                    retryStarts.add(copyStarts);
-                                }
+                            @Override
+                            public void onError(Throwable throwable) {
+                                retries.add(request);
+                                retryStarts.add(copyStarts);
+                            }
 
-                                @Override
-                                public void onCompleted() {
-                                    sent.set(0, sent.get(0)-1);
-                                    long end = System.currentTimeMillis();
-                                    for (int j = 0 ; j < copyStarts.size() ; j++) {
-                                        if (c + j > warmup)
-                                            stats.nextCompletion(copyStarts.get(j), end, recordSize + 5);
-                                    }
+                            @Override
+                            public void onCompleted() {
+                                sent.set(0, sent.get(0)-1);
+                                long end = System.currentTimeMillis();
+                                for (int j = 0 ; j < copyStarts.size() ; j++) {
+                                    if (c + j > warmup)
+                                        stats.nextCompletion(copyStarts.get(j), end, recordSize + 5);
                                 }
-                            };
-                            stats.nextAdded((recordSize + 5) * request.getValuesMap().size());
-                            asyncDatastore.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS).batch(request, observer);
-                            sent.set(0, sent.get(0)+1);
-                            sent.set(1, sent.get(1)+1);
-                            long startToWaitTime = System.currentTimeMillis();
-                            while (System.currentTimeMillis() < startToWaitTime + interval) {
-                                try {
-                                    Thread.sleep(1);
-                                     while (retries.size() != 0) {
+                            }
+                        };
+                        stats.nextAdded((recordSize + 5) * request.getValuesMap().size());
+                        asyncDatastore.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS).batch(request, observer);
+                        sent.set(0, sent.get(0)+1);
+                        sent.set(1, sent.get(1)+1);
+                        long startToWaitTime = System.currentTimeMillis();
+                        while (System.currentTimeMillis() < startToWaitTime + interval) {
+                            try {
+                                Thread.sleep(1);
+                                 while (retries.size() != 0) {
 //                                         logger.info("retry size is " + retries.size());
-                                         if (stats.getNumberOfRetries(retries.get(0).getId()) < maxRetry || maxRetry.equals(INFINITY))
-                                            retry(warmup, timeout, stats, retries, retryStarts, sent, c, recordSize);
-                                        retries.remove(0);
-                                        retryStarts.remove(0);
-                                        if (System.currentTimeMillis() < startToWaitTime + interval)
-                                            break;
-                                    }
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
+                                     if (stats.getNumberOfRetries(retries.get(0).getId()) < maxRetry || maxRetry.equals(INFINITY))
+                                        retry(warmup, timeout, stats, retries, retryStarts, sent, c, recordSize);
+                                    retries.remove(0);
+                                    retryStarts.remove(0);
+                                    if (System.currentTimeMillis() < startToWaitTime + interval)
+                                        break;
                                 }
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
                             }
                         }
-                        values.clear();
-                        starts.clear();
-                        batched = 0;
                     }
-                }
-
-                if (benchmarkTime != null) {
-                    long timeElapsed = (sendStartMs - sendingStart) / 1000;
-                    if (timeElapsed >= benchmarkTime)
-                        break;
-                }
-
-                if (dynamicBatching && currentBatchIndex < dynamicBatchSize.size()) {
-                    long timeElapsed = (sendStartMs - lastDynamicBatchCheckpoint) / 1000;
-                    if (timeElapsed >= dynamicBatchTimes.get(currentBatchIndex)) {
-                        lastDynamicBatchCheckpoint = System.currentTimeMillis();
-                        currentBatchIndex++;
-                        if (currentBatchIndex < dynamicBatchSize.size()) {
-                            batchSize = dynamicBatchSize.get(currentBatchIndex);
-                            logger.info("Changed batch size to " + batchSize);
-                            stats.updateBatchSize(batchSize);
-                        }
-                    }
-                }
-
-                if (throttler.shouldThrottle(i, sendStartMs)) {
-                    throttler.throttle();
+                    values.clear();
+                    starts.clear();
+                    batched = 0;
                 }
             }
 
-            long now = System.currentTimeMillis();
-            while (sent.get(0) != 0) {
-                try {
-                    Thread.sleep(10);
-                    if (System.currentTimeMillis() - now > timeout)
-                        break;
+            if (benchmarkTime != null) {
+                long timeElapsed = (sendStartMs - sendingStart) / 1000;
+                if (timeElapsed >= benchmarkTime)
+                    break;
+            }
+
+            if (dynamicBatching && currentBatchIndex < dynamicBatchSize.size()) {
+                long timeElapsed = (sendStartMs - lastDynamicBatchCheckpoint) / 1000;
+                if (timeElapsed >= dynamicBatchTimes.get(currentBatchIndex)) {
+                    lastDynamicBatchCheckpoint = System.currentTimeMillis();
+                    currentBatchIndex++;
+                    if (currentBatchIndex < dynamicBatchSize.size()) {
+                        batchSize = dynamicBatchSize.get(currentBatchIndex);
+                        logger.info("Changed batch size to " + batchSize);
+                        stats.updateBatchSize(batchSize);
+                    }
+                }
+            }
+
+            if (throttler.shouldThrottle(i, sendStartMs)) {
+                throttler.throttle();
+            }
+        }
+
+        long now = System.currentTimeMillis();
+        while (sent.get(0) != 0) {
+            try {
+                Thread.sleep(10);
+                if (System.currentTimeMillis() - now > timeout)
+                    break;
 //                    while (retries.size() != 0) {
 ////                        logger.info("retry size is " + retries.size());
 //                        retry(warmup, timeout, stats, retries, retryStarts, sent, warmup + 1, recordSize);
 //                        retries.remove(0);
 //                        retryStarts.remove(0);
 //                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-
-
-            System.out.println("sent : " + sent.get(1));
-            System.out.println("Should retry is " + retries.size());
-
-            // TODO: closing open things?
-            /* print final results */
-            stats.printTotal();
-
-        } catch (ArgumentParserException e) {
-            if (args.length == 0) {
-                parser.printHelp();
-            } else {
-                parser.handleError(e);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         }
+
+
+        System.out.println("sent : " + sent.get(1));
+        System.out.println("Should retry is " + retries.size());
+
+        // TODO: closing open things?
+        /* print final results */
+        stats.printTotal();
 
 
     }
@@ -596,6 +615,46 @@ public class Performance {
         private int startedBytes;
         private int startedWindowBytes;
 
+        // Metrics
+        private static final Summary finishedRequestsBytes = Summary.build()
+                .name("paxos_requests_finished_bytes")
+                .help("size of requests that finished")
+                .register();
+        private static final Summary addedRequestsBytes = Summary.build()
+                .name("paxos_requests_sent_bytes")
+                .help("size of requests sent to the leader")
+                .register();
+        private static final Gauge batchSizeGauge = Gauge.build()
+                .name("paxos_batch_size")
+                .help("Batch size")
+                .register();
+        private static final Gauge intervalGauge = Gauge.build()
+                .name("paxos_interval_total")
+                .help("Interval between requests")
+                .register();
+        private static final Gauge timeoutGauge = Gauge.build()
+                .name("paxos_timeout_total")
+                .help("timeout of a request")
+                .register();
+        private static final Summary finishedRequestsLatency = Summary.build()
+                .name("paxos_requests_finished_latency")
+                .help("Latency of requests responded")
+                .quantile(0.5, 0.001)    // 0.5 quantile (median) with 0.01 allowed error
+                .quantile(0.95, 0.005)  // 0.95 quantile with 0.005 allowed error
+                .register();
+        private static final Counter requestRetried = Counter.build()
+                .name("paxos_requests_retired_total")
+                .help("Number of requests that retried")
+                .register();
+        private static final Counter allRetries = Counter.build()
+                .name("paxos_request_retries_total")
+                .help("Number of request retries")
+                .register();
+        private static final Counter retriesCompleted = Counter.build()
+                .name("paxos_request_retry_completed_total")
+                .help("Number of retries that has been compelted")
+                .register();
+
         public Stats(long numRecords, int reportingInterval, String resultFilePath, String metricsFilePath, int recordSize, int batchSize, int interval, int timeout) {
             this.start = System.currentTimeMillis();
             this.windowStart = System.currentTimeMillis();
@@ -623,8 +682,11 @@ public class Performance {
             this.numRecords = numRecords;
             this.recordSize = recordSize;
             this.batchSize = batchSize;
+            batchSizeGauge.set(batchSize);
             this.interval = interval;
+            intervalGauge.set(interval);
             this.timeout = timeout;
+            timeoutGauge.set(timeout);
             this.retries = new HashMap<>();
             createResultCSVFiles(resultFilePath, metricsFilePath);
         }
@@ -664,6 +726,8 @@ public class Performance {
         public synchronized void record(int iter, int latency, int bytes, long time) {
             this.count++;
             this.bytes += bytes;
+            finishedRequestsBytes.observe(bytes);
+            finishedRequestsLatency.observe((double) latency/1000);
             this.totalLatency += latency;
             this.maxLatency = Math.max(this.maxLatency, latency);
             this.windowCount++;
@@ -678,7 +742,6 @@ public class Performance {
         }
 
         private void report(long time) {
-            /* maybe report the recent perf */
             if (time - windowStart >= reportingInterval) {
                 printWindow();
                 newWindow();
@@ -695,6 +758,7 @@ public class Performance {
         public synchronized void nextAdded(int bytes) {
             long now = System.currentTimeMillis();
             this.started++;
+            addedRequestsBytes.observe(bytes);
             this.startedBytes += bytes;
             this.startedWindowBytes += bytes;
 
@@ -824,10 +888,13 @@ public class Performance {
         }
 
         public void addRetry(long c) {
+            allRetries.inc();
             if (retries.containsKey(c))
                 retries.put(c, retries.get(c) + 1);
-            else
+            else {
                 retries.put(c, 1);
+                requestRetried.inc();
+            }
         }
 
         public Integer getNumberOfRetries(long c) {
@@ -836,9 +903,11 @@ public class Performance {
 
         public void updateBatchSize(Integer batchSize) {
             this.batchSize = batchSize;
+            batchSizeGauge.set(batchSize);
         }
 
         public void completeRetry() {
+            retriesCompleted.inc();
             completedRetries ++;
         }
     }
