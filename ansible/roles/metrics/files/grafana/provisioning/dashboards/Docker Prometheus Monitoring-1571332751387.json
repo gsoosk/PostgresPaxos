@@ -31,22 +31,393 @@
       }
     ]
   },
-  "description": "Docker Monitoring Template",
+  "description": "",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "gnetId": 179,
   "graphTooltip": 1,
-  "id": 3,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "left",
+            "displayMode": "auto",
+            "filterable": false,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 59,
+      "options": {
+        "footer": {
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "count"
+          ],
+          "show": true
+        },
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "postgres_memory_usage_server3"
+          }
+        ]
+      },
+      "pluginVersion": "9.3.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_finished_bytes_sum[$interval])",
+          "format": "time_series",
+          "legendFormat": "goodput",
+          "range": true,
+          "refId": "goodput"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(paxos_requests_sent_bytes_sum[$interval])",
+          "hide": false,
+          "legendFormat": "incoming_throughput",
+          "range": true,
+          "refId": "throughput"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "paxos_batch_size",
+          "hide": false,
+          "legendFormat": "batch_size",
+          "range": true,
+          "refId": "batch_size"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "paxos_interval_total",
+          "hide": false,
+          "legendFormat": "interval",
+          "range": true,
+          "refId": "interval"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "paxos_timeout_total",
+          "hide": false,
+          "legendFormat": "timeout",
+          "range": true,
+          "refId": "timeout"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "paxos_request_retries_total",
+          "hide": false,
+          "legendFormat": "total_retries",
+          "range": true,
+          "refId": "retries_total"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(paxos_request_retries_total[$interval]) ",
+          "hide": false,
+          "legendFormat": "total_retries_rate",
+          "range": true,
+          "refId": "retries_rate"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "paxos_request_retry_completed_total",
+          "hide": false,
+          "legendFormat": "completed_retries",
+          "range": true,
+          "refId": "completed_retries_total"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(paxos_request_retry_completed_total[$interval])",
+          "hide": false,
+          "legendFormat": "completed_retries_rate",
+          "range": true,
+          "refId": "compelted_retries_rate"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(paxos_requests_finished_latency_sum [$interval]) / rate(paxos_requests_finished_latency_count[$interval])",
+          "hide": false,
+          "legendFormat": "average_latency_of_finished_requests",
+          "range": true,
+          "refId": "latency_rate"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum by (node) (rate(container_network_receive_bytes_total{image!=\"\", name=\"postgres_service\"} [$interval]) + rate(container_network_transmit_bytes_total{image!=\"\", name=\"postgres_service\"} [$interval]))",
+          "hide": false,
+          "legendFormat": "postgres_network_rate_{{node}}",
+          "range": true,
+          "refId": "postgres_network"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(container_network_receive_bytes_total{image!=\"\", name=\"postgres_service\"}[$interval])",
+          "hide": false,
+          "legendFormat": "postgres_network_receive_rate_{{node}}",
+          "range": true,
+          "refId": "postgres_network_rec"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(container_network_transmit_bytes_total{image!=\"\", name=\"postgres_service\"}[$interval])",
+          "hide": false,
+          "legendFormat": "postgres_network_transmit_{{node}}",
+          "range": true,
+          "refId": "postgres_network_send"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum by (node) (rate(node_network_receive_bytes_total{node!=\"client\"} [$interval]) + rate(node_network_transmit_bytes_total{node!=\"client\"} [$interval]))",
+          "hide": false,
+          "legendFormat": "node_network_usage_{{node}}",
+          "range": true,
+          "refId": "node_network"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "avg(node_cpu_seconds_total{node!=\"client\", mode=\"idle\"}) by (node)",
+          "hide": false,
+          "legendFormat": "node_avg_cpu_seconds_{{node}}",
+          "range": true,
+          "refId": "node_cpu_seconds"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "((100 - (avg(irate(node_cpu_seconds_total{node!=\"client\", mode=\"idle\"}[$interval])) by (node) * 100)) > 0)",
+          "hide": false,
+          "legendFormat": "node_avg_cpu_rate_{{node}}",
+          "range": true,
+          "refId": "node_average_cpu_rate"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "(avg(irate(container_cpu_usage_seconds_total{image!=\"\", name=\"postgres_service\"}[1m])) by (node)) * 100",
+          "hide": false,
+          "legendFormat": "postgres_cpu_rate_{{node}}",
+          "range": true,
+          "refId": "postgres_cpu_rate"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(node_disk_io_time_seconds_total{device=\"sda\", node!=\"client\"}[$interval])",
+          "hide": false,
+          "legendFormat": "node_io_time_{{node}}",
+          "range": true,
+          "refId": "node_io_time"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(node_disk_written_bytes_total{device=\"sda\", node!=\"client\"}[$interval]) + rate(node_disk_read_bytes_total{device=\"sda\", node!=\"client\"}[$interval])\n",
+          "hide": false,
+          "legendFormat": "node_io_rate_{{node}}",
+          "range": true,
+          "refId": "node_io_rate"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "(sum(node_memory_MemTotal_bytes{node!=\"client\"}) by (node)) - (sum(node_memory_MemAvailable_bytes{node!=\"client\"}) by (node))",
+          "hide": false,
+          "legendFormat": "node_memory_usage_{{node}}",
+          "range": true,
+          "refId": "node_memory"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "container_memory_usage_bytes{image!=\"\", name=\"postgres_service\"}",
+          "hide": false,
+          "legendFormat": "postgres_memory_usage_{{node}}",
+          "range": true,
+          "refId": "postgres_memory"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_current{node!=\"client\"}",
+          "hide": false,
+          "legendFormat": "jvm_threads_current_{{node}}",
+          "range": true,
+          "refId": "jvm_threads_current"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_state{node!=\"client\", state=\"BLOCKED\"}",
+          "hide": false,
+          "legendFormat": "jvm_threads_blocked_{{node}}",
+          "range": true,
+          "refId": "jvm_threads_blocked"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_bytes_used{node!=\"client\", area=\"heap\"}",
+          "hide": false,
+          "legendFormat": "jvm_heap_usage_{{node}}",
+          "range": true,
+          "refId": "jvm_heap_usage"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_gc_collection_seconds_count{node!=\"client\", gc=\"G1 Young Generation\"}[20s])",
+          "hide": false,
+          "legendFormat": "jvm_gc_usage_rate_20_{{node}}",
+          "range": true,
+          "refId": "jvm_gc_usage"
+        }
+      ],
+      "title": "Paxos Data Export",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {}
+        }
+      ],
+      "type": "table"
+    },
     {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 5
       },
       "id": 49,
       "panels": [],
@@ -169,34 +540,6 @@
                 "value": "none"
               }
             ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "Goodput",
-                  "Incoming Throughput",
-                  "Completed Retries",
-                  "batch",
-                  "retries"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
           }
         ]
       },
@@ -204,7 +547,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 1
+        "y": 6
       },
       "id": 39,
       "options": {
@@ -290,6 +633,182 @@
           "legendFormat": "Completed Retries",
           "range": true,
           "refId": "E"
+        }
+      ],
+      "title": "Paxos Retries",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "batch"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Batch Size"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Retries"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed Retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisSoftMax",
+                "value": 7
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 55,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          ""
+        ],
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_finished_bytes_sum[$interval])",
+          "instant": false,
+          "legendFormat": "Goodput",
+          "range": true,
+          "refId": "A"
         },
         {
           "datasource": {
@@ -297,14 +816,42 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "(sum by (node) (rate(container_network_receive_bytes_total{image!=\"\", name=\"postgres_service\"}[$interval] ) ))",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_sent_bytes_sum[$interval])",
+          "format": "time_series",
           "hide": false,
-          "legendFormat": "postgres network-{{node}}",
+          "legendFormat": "Incoming Throughput",
           "range": true,
-          "refId": "F"
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "paxos_batch_size",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "batch",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(paxos_requests_finished_latency_sum [$interval]) / rate(paxos_requests_finished_latency_count[$interval])",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "D"
         }
       ],
-      "title": "Paxos Retries",
+      "title": "Paxos Average Latency of Finished Requests",
       "transformations": [],
       "type": "timeseries"
     },
@@ -431,7 +978,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 11
+        "y": 26
       },
       "id": 41,
       "options": {
@@ -607,7 +1154,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 11
+        "y": 26
       },
       "id": 40,
       "options": {
@@ -770,6 +1317,230 @@
               },
               {
                 "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Retries"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed Retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisSoftMax",
+                "value": 7
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Network Usage"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 52,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          ""
+        ],
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_finished_bytes_sum[$interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Goodput",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_sent_bytes_sum[$interval])",
+          "format": "time_series",
+          "hide": false,
+          "legendFormat": "Incoming Throughput",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "paxos_batch_size",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "batch",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum by (node) (rate(node_network_receive_bytes_total{node!=\"client\"} [$interval]) + rate(node_network_transmit_bytes_total{node!=\"client\"} [$interval]))",
+          "hide": false,
+          "legendFormat": "Network Usage ({{node}})",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Node Network Usage",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Paxos",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "batch"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Batch Size"
+              },
+              {
+                "id": "custom.axisPlacement",
                 "value": "right"
               },
               {
@@ -844,7 +1615,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 45
       },
       "id": 44,
       "options": {
@@ -1068,7 +1839,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 45
       },
       "id": 45,
       "options": {
@@ -1274,6 +2045,454 @@
             "properties": [
               {
                 "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Disk IO Time Rate"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 53
+      },
+      "id": 56,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          ""
+        ],
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_finished_bytes_sum[$interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Goodput",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_sent_bytes_sum[$interval])",
+          "format": "time_series",
+          "hide": false,
+          "legendFormat": "Incoming Throughput",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "paxos_batch_size",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "batch",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(node_disk_io_time_seconds_total{device=\"sda\", node!=\"client\"}[$interval])",
+          "hide": false,
+          "legendFormat": "Disk IO Time ({{node}})",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Node Disk IO Time",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Paxos",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "batch"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Batch Size"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Retries"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed Retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisSoftMax",
+                "value": 7
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Disk IO Usage"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 53
+      },
+      "id": 57,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          ""
+        ],
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_finished_bytes_sum[$interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Goodput",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_sent_bytes_sum[$interval])",
+          "format": "time_series",
+          "hide": false,
+          "legendFormat": "Incoming Throughput",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "paxos_batch_size",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "batch",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(node_disk_written_bytes_total{device=\"sda\", node!=\"client\"}[$interval]) + rate(node_disk_read_bytes_total{device=\"sda\", node!=\"client\"}[$interval])\n",
+          "hide": false,
+          "legendFormat": "Disk IO ({{node}})",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Node Disk IO",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Paxos",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "batch"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Batch Size"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Retries"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed Retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisSoftMax",
+                "value": 7
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "unit",
                 "value": "bytes"
               },
               {
@@ -1292,7 +2511,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 27
+        "y": 61
       },
       "id": 46,
       "options": {
@@ -1516,7 +2735,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 27
+        "y": 61
       },
       "id": 47,
       "options": {
@@ -1583,7 +2802,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "container_memory_max_usage_bytes{image!=\"\", name=\"postgres_service\"}",
+          "expr": "container_memory_usage_bytes{image!=\"\", name=\"postgres_service\"}",
           "hide": false,
           "legendFormat": "Postgres Memory Usage ({{node}})",
           "range": true,
@@ -1591,6 +2810,902 @@
         }
       ],
       "title": "Postgres Memory",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Paxos",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "batch"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Batch Size"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Retries"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed Retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisSoftMax",
+                "value": 7
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Threads"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 69
+      },
+      "id": 50,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          ""
+        ],
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_finished_bytes_sum[$interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Goodput",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_sent_bytes_sum[$interval])",
+          "format": "time_series",
+          "hide": false,
+          "legendFormat": "Incoming Throughput",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "paxos_batch_size",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "batch",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_current{node!=\"client\"}",
+          "hide": false,
+          "legendFormat": "Number of Threads ({{node}})",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "JVM Number of Threads",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Paxos",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "batch"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Batch Size"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Retries"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed Retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisSoftMax",
+                "value": 7
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Threads"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 69
+      },
+      "id": 51,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          ""
+        ],
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_finished_bytes_sum[$interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Goodput",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_sent_bytes_sum[$interval])",
+          "format": "time_series",
+          "hide": false,
+          "legendFormat": "Incoming Throughput",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "paxos_batch_size",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "batch",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_threads_state{node!=\"client\", state=\"BLOCKED\"}",
+          "hide": false,
+          "legendFormat": "Blocked Threads ({{node}})",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "JVM Number of  BlockedThreads",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Paxos",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "batch"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Batch Size"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Retries"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed Retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisSoftMax",
+                "value": 7
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Memory Usage"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 77
+      },
+      "id": 53,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          ""
+        ],
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_finished_bytes_sum[$interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Goodput",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_sent_bytes_sum[$interval])",
+          "format": "time_series",
+          "hide": false,
+          "legendFormat": "Incoming Throughput",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "paxos_batch_size",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "batch",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "jvm_memory_bytes_used{node!=\"client\", area=\"heap\"}",
+          "hide": false,
+          "legendFormat": "JVM Memory Usage({{node}})",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "JVM Memory Usage (Heap)",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Paxos",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "batch"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Batch Size"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "unit",
+                "value": "decbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Retries"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Completed Retries"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisSoftMax",
+                "value": 7
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "GC Usage Rate (20s)"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 77
+      },
+      "id": 54,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          ""
+        ],
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_finished_bytes_sum[$interval])",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Goodput",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "rate(paxos_requests_sent_bytes_sum[$interval])",
+          "format": "time_series",
+          "hide": false,
+          "legendFormat": "Incoming Throughput",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "paxos_batch_size",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "batch",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "rate(jvm_gc_collection_seconds_count{node!=\"client\", gc=\"G1 Young Generation\"}[20s])",
+          "hide": false,
+          "legendFormat": "GC Usage ({{node}})",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "JVM GC Usage",
       "transformations": [],
       "type": "timeseries"
     },
@@ -1604,7 +3719,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 85
       },
       "id": 17,
       "panels": [],
@@ -1662,7 +3777,7 @@
         "h": 7,
         "w": 3,
         "x": 0,
-        "y": 36
+        "y": 86
       },
       "id": 15,
       "links": [],
@@ -1681,7 +3796,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -1739,7 +3854,7 @@
         "h": 4,
         "w": 3,
         "x": 3,
-        "y": 36
+        "y": 86
       },
       "id": 35,
       "links": [],
@@ -1758,7 +3873,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -1818,7 +3933,7 @@
         "h": 7,
         "w": 5,
         "x": 6,
-        "y": 36
+        "y": 86
       },
       "id": 13,
       "links": [],
@@ -1837,7 +3952,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -1899,7 +4014,7 @@
         "h": 7,
         "w": 4,
         "x": 11,
-        "y": 36
+        "y": 86
       },
       "id": 11,
       "links": [],
@@ -1918,7 +4033,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -1981,7 +4096,7 @@
         "h": 7,
         "w": 4,
         "x": 15,
-        "y": 36
+        "y": 86
       },
       "id": 31,
       "links": [],
@@ -2000,7 +4115,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -2058,7 +4173,7 @@
         "h": 3,
         "w": 3,
         "x": 3,
-        "y": 40
+        "y": 90
       },
       "id": 37,
       "links": [],
@@ -2077,7 +4192,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -2139,7 +4254,7 @@
         "h": 6,
         "w": 6,
         "x": 0,
-        "y": 43
+        "y": 93
       },
       "id": 4,
       "links": [],
@@ -2156,7 +4271,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -2223,7 +4338,7 @@
         "h": 6,
         "w": 6,
         "x": 6,
-        "y": 43
+        "y": 93
       },
       "id": 6,
       "links": [],
@@ -2240,7 +4355,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -2310,7 +4425,7 @@
         "h": 6,
         "w": 7,
         "x": 12,
-        "y": 43
+        "y": 93
       },
       "id": 7,
       "links": [],
@@ -2327,7 +4442,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -2370,7 +4485,7 @@
         "h": 9,
         "w": 6,
         "x": 0,
-        "y": 49
+        "y": 99
       },
       "hiddenSeries": false,
       "id": 25,
@@ -2391,7 +4506,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -2479,7 +4594,7 @@
         "h": 9,
         "w": 6,
         "x": 6,
-        "y": 49
+        "y": 99
       },
       "hiddenSeries": false,
       "id": 27,
@@ -2500,7 +4615,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -2595,7 +4710,7 @@
         "h": 9,
         "w": 7,
         "x": 12,
-        "y": 49
+        "y": 99
       },
       "hiddenSeries": false,
       "id": 28,
@@ -2616,7 +4731,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -2678,7 +4793,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 58
+        "y": 108
       },
       "id": 19,
       "panels": [],
@@ -2719,7 +4834,7 @@
         "h": 14,
         "w": 6,
         "x": 0,
-        "y": 59
+        "y": 109
       },
       "hiddenSeries": false,
       "id": 3,
@@ -2745,7 +4860,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -2827,7 +4942,7 @@
         "h": 14,
         "w": 6,
         "x": 6,
-        "y": 59
+        "y": 109
       },
       "hiddenSeries": false,
       "id": 2,
@@ -2853,7 +4968,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -2935,7 +5050,7 @@
         "h": 14,
         "w": 6,
         "x": 12,
-        "y": 59
+        "y": 109
       },
       "hiddenSeries": false,
       "id": 9,
@@ -2961,7 +5076,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -3040,7 +5155,7 @@
         "h": 14,
         "w": 6,
         "x": 18,
-        "y": 59
+        "y": 109
       },
       "hiddenSeries": false,
       "id": 8,
@@ -3066,7 +5181,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.6",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -3192,7 +5307,7 @@
           }
         ],
         "query": "1m,10m,30m,1h,6h,12h,1d,7d,14d,30d",
-        "queryValue": "2s",
+        "queryValue": "5s",
         "refresh": 2,
         "skipUrlSync": false,
         "type": "interval"
@@ -3302,8 +5417,8 @@
     ]
   },
   "time": {
-    "from": "2023-01-25T22:38:47.974Z",
-    "to": "2023-01-25T23:22:25.842Z"
+    "from": "2023-02-06T05:33:54.448Z",
+    "to": "2023-02-06T06:12:53.864Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -3331,8 +5446,8 @@
     ]
   },
   "timezone": "browser",
-  "title": "Docker Prometheus Monitoring 2 Copy",
-  "uid": "2iTo6Oo4z",
-  "version": 8,
+  "title": "Paxos Prometheus Monitoring",
+  "uid": "2iTo6Oo4a",
+  "version": 2,
   "weekStart": ""
 }
