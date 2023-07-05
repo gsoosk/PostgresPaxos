@@ -709,7 +709,7 @@ public class Performance {
                 .help("Number of retries that has been compelted")
                 .register();
 
-        public Stats(long numRecords, int reportingInterval, String resultFilePath, String metricsFilePath, int recordSize, int batchSize, int interval, int timeout) {
+        public Stats(long numRecords, int reportingInterval, String resultFilePath, String metricsFilePath, int recordSize, int batchSize, Double interval, int timeout) {
             this.start = System.currentTimeMillis();
             this.windowStart = System.currentTimeMillis();
             this.iteration = 0;
@@ -961,7 +961,7 @@ public class Performance {
         }
 
 
-        public void updateInterval(Integer interval) {
+        public void updateInterval(Double interval) {
             this.interval = interval;
             intervalGauge.set(interval);
         }
