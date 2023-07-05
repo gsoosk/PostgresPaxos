@@ -49,7 +49,6 @@ public class Performance {
             HTTPServer server = new HTTPServer.Builder()
                     .withPort(7000)
                     .build();
-
             perf.start();
             server.close();
         } catch (ArgumentParserException ignored) {
@@ -116,6 +115,7 @@ public class Performance {
         port = res.getInt("port");
 
         Integer batchSize = res.getInt("batchSize");
+        Double interval = res.getDouble("interval");
 
         List<Integer> dynamicBatchSize = res.getList("dynamicBatchSize");
         List<Integer> dynamicBatchTimes = res.getList("dynamicBatchTime");
@@ -127,6 +127,17 @@ public class Performance {
             batchSize = dynamicBatchSize.get(currentBatchIndex);
             dynamicBatching = true;
         }
+        List<Double> dynamicInterval = res.getList("dynamicInterval");
+        List<Integer> dynamicIntervalTime = res.getList("dynamicIntervalTime");
+        int currentIntervalIndex = 0;
+        boolean dynamicIntervaling = false;
+        if (dynamicInterval != null && dynamicIntervalTime != null ) {
+            if (dynamicInterval.size() != dynamicIntervalTime.size())
+                throw new Exception("number of dynamic interval times and intervals should be equal");
+            interval = dynamicInterval.get(currentIntervalIndex);
+            dynamicIntervaling = true;
+        }
+
         Integer recordSize = res.getInt("recordSize");
         long warmup = batchSize != null ? (batchSize / recordSize) * 4L : 100;
         long numRecords = res.getLong("numRecords") == null ? Integer.MAX_VALUE - warmup - 2 : res.getLong("numRecords");
@@ -139,9 +150,10 @@ public class Performance {
         // since default value gets printed with the help text, we are escaping \n there and replacing it with correct value here.
         String payloadDelimiter = res.getString("payloadDelimiter").equals("\\n") ? "\n" : res.getString("payloadDelimiter");
         Long benchmarkTime = res.getLong("benchmarkTime");
-        Integer interval = res.getInt("interval");
-        Integer timeout = res.getInt("timeout") != null ? res.getInt("timeout") : interval * 2;
+        Integer timeout = res.getInt("timeout") != null ? res.getInt("timeout") : interval.intValue() * 2;
         Integer maxRetry = res.getInt("maxRetry");
+
+        Boolean exponentialLoad = res.getBoolean("exponentialLoad") == null ? false : res.getBoolean("exponentialLoad");
 
         List<byte[]> payloadByteList = readPayloadFile(payloadFilePath, payloadDelimiter);
 
@@ -152,6 +164,7 @@ public class Performance {
             payload = new byte[recordSize];
         }
         Random random = new Random(0);
+        Random intervalRand = new Random(1);
         Stats stats = new Stats(numRecords, 1000, resultFilePath, metricsFilePath, recordSize, batchSize, interval, timeout);
         long startMs = System.currentTimeMillis();
 
@@ -180,6 +193,7 @@ public class Performance {
         boolean batching = batchSize != null;
         long sendingStart = System.currentTimeMillis();
         long lastDynamicBatchCheckpoint = System.currentTimeMillis();
+        long lastDynamicIntervalCheckpoint = System.currentTimeMillis();
 //            TODO: Refactor this function
         for (long i = 0; i < numRecords; i++) {
             payload = generateRandomPayload(recordSize, payloadByteList, payload, random);
@@ -249,8 +263,10 @@ public class Performance {
                         asyncDatastore.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS).batch(request, observer);
                         sent.set(0, sent.get(0)+1);
                         sent.set(1, sent.get(1)+1);
+                        double lambda = (double) -1000/interval;
+                        double nextTime = exponentialLoad ? ((Math.log(1-intervalRand.nextDouble())/(lambda)) * 1000) : interval;
                         long startToWaitTime = System.currentTimeMillis();
-                        while (System.currentTimeMillis() < startToWaitTime + interval) {
+                        while (System.currentTimeMillis() < startToWaitTime + nextTime) {
                             try {
                                 Thread.sleep(1);
                                  while (retries.size() != 0) {
@@ -259,7 +275,7 @@ public class Performance {
                                         retry(warmup, timeout, stats, retries, retryStarts, sent, c, recordSize);
                                     retries.remove(0);
                                     retryStarts.remove(0);
-                                    if (System.currentTimeMillis() < startToWaitTime + interval)
+                                    if (System.currentTimeMillis() < startToWaitTime + nextTime)
                                         break;
                                 }
                             } catch (InterruptedException e) {
@@ -288,6 +304,20 @@ public class Performance {
                         batchSize = dynamicBatchSize.get(currentBatchIndex);
                         logger.info("Changed batch size to " + batchSize);
                         stats.updateBatchSize(batchSize);
+                    }
+                }
+            }
+
+
+            if (dynamicIntervaling && currentIntervalIndex < dynamicInterval.size()) {
+                long timeElapsed = (sendStartMs - lastDynamicIntervalCheckpoint) / 1000;
+                if (timeElapsed >= dynamicIntervalTime.get(currentBatchIndex)) {
+                    lastDynamicIntervalCheckpoint = System.currentTimeMillis();
+                    currentIntervalIndex++;
+                    if (currentIntervalIndex < dynamicInterval.size()) {
+                        interval = dynamicInterval.get(currentIntervalIndex);
+                        logger.info("Changed interval to " + interval);
+                        stats.updateInterval(interval);
                     }
                 }
             }
@@ -535,8 +565,8 @@ public class Performance {
 
         parser.addArgument("--interval")
                 .action(store())
-                .required(true)
-                .type(Integer.class)
+                .required(false)
+                .type(Double.class)
                 .dest("interval")
                 .metavar("INTERVAL")
                 .help("interval between each packet.  Set this -1 to send packets blocking");
@@ -575,6 +605,30 @@ public class Performance {
                 .help("deadline for a dynamic batch size");
 
 
+        parser.addArgument("--dynamic-interval")
+                .action(append())
+                .required(false)
+                .type(Double.class)
+                .dest("dynamicInterval")
+                .metavar("DYNAMICINTERVAL")
+                .help("dynamic interval until a specific time");
+
+        parser.addArgument("--dynamic-interval-time")
+                .action(append())
+                .required(false)
+                .type(Integer.class)
+                .dest("dynamicIntervalTime")
+                .metavar("DYNAMICINTERVALTIME")
+                .help("deadline for a dynamic interval");
+
+        parser.addArgument("--exponential-load")
+                .action(store())
+                .required(false)
+                .type(Boolean.class)
+                .dest("exponentialLoad")
+                .metavar("EXPONENTIALLOAD")
+                .help("requests follow an exponential random distribution with lambda=1000/interval");
+
 
 
 
@@ -602,7 +656,7 @@ public class Performance {
         private int recordSize;
         private int batchSize;
         private String resultFilePath;
-        private int interval;
+        private double interval;
         private int timeout;
         private Map<Long, Integer> retries;
         private int previousWindowRequestRetried;
@@ -904,6 +958,12 @@ public class Performance {
         public void updateBatchSize(Integer batchSize) {
             this.batchSize = batchSize;
             batchSizeGauge.set(batchSize);
+        }
+
+
+        public void updateInterval(Integer interval) {
+            this.interval = interval;
+            intervalGauge.set(interval);
         }
 
         public void completeRetry() {

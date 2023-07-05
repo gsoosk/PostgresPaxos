@@ -2,39 +2,39 @@ all:
   children:
     servers:
         hosts:
-          129.114.108.150:
+          129.114.109.72:
             ansible_user: "cc"
             ansible_connection: ssh
             port: 8001
-            discovery_ip: 10.52.2.64
+            discovery_ip: 10.52.3.90
             postgres: 9000
             partition: 1
 
-          129.114.109.89:
+          129.114.109.195:
             ansible_user: "cc"
             ansible_connection: ssh
             port: 8002
-            discovery_ip: 10.52.3.101
+            discovery_ip: 10.52.2.181
             postgres: 9000
             partition: 2
 
-          129.114.109.11:
+          129.114.108.48:
             ansible_user: "cc"
             ansible_connection: ssh
             port: 8003
-            discovery_ip: 10.52.3.217
+            discovery_ip: 10.52.3.72
             postgres: 9000
             partition: 3
 
     client:
       hosts:
-        129.114.108.121:
+        129.114.109.41:
           ansible_user: "cc"
           ansible_connection: ssh
-          discovery_ip: 10.52.2.120
+          discovery_ip: 10.52.0.237
 
     prometheus:
       hosts:
-        129.114.108.189:
+        129.114.108.38:
           ansible_user: "cc"
           ansible_connection: ssh
