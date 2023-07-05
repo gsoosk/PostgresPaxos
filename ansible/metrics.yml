@@ -1,25 +1,25 @@
-##This playbook initilize metrics on servers
-#---
-#- name: Run a reverse proxy to address connections
-#  hosts:
-#    - servers
-#    - client
-#  become: yes
-#  tasks:
-#    - include_role:
-#        name: common
-#        tasks_from: reverse_proxy.yml
-#
-#
-#- name: Run cAdvisor and node-exporter on servers for host metrics
-#  hosts:
-#    - servers
-#    - client
-#  become: yes
-#  tasks:
-#    - include_role:
-#        name: metrics
-#        tasks_from: host_metrics.yml
+#This playbook initilize metrics on servers
+---
+- name: Run a reverse proxy to address connections
+  hosts:
+    - servers
+    - client
+  become: yes
+  tasks:
+    - include_role:
+        name: common
+        tasks_from: reverse_proxy.yml
+
+
+- name: Run cAdvisor and node-exporter on servers for host metrics
+  hosts:
+    - servers
+    - client
+  become: yes
+  tasks:
+    - include_role:
+        name: metrics
+        tasks_from: host_metrics.yml
 
 
 - name: Run Prometheus and Grafana

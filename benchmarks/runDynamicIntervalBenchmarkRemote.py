@@ -57,18 +57,20 @@ performance_jar = "PaxosKV-performance.jar"
 
 
 # interval = 500 and timeout 700
-dynamic_batch_sizes = [(3000, 180)]
+dynamic_intervals = [(125, 180), (71
 
-print(f"dynamic batch is {dynamic_batch_sizes}")
+                                  , 60), (125, 180)]
+
+print(f"dynamic interval is {dynamic_intervals}")
 benchmark_time = 0
-for batch in dynamic_batch_sizes:
-    benchmark_time += batch[1]
+for interval in dynamic_intervals:
+    benchmark_time += interval[1]
 print(f"benchmark time is {benchmark_time}")
 
 number_of_clients = 1
 
 result_folder = "./result"
-interval = 33
+batch_size = 100000
 timeout = 1000
 max_retry = 2
 
@@ -98,22 +100,22 @@ def runBenchmark():
     subprocess.Popen(["ssh", f'cc@{client_address}', "sudo", "rm", "-rf", "~/paxos/result",]).wait()
     subprocess.Popen(["ssh", f'cc@{client_address}', "sudo", "mkdir", "~/paxos/result",]).wait()
 
-    print(f"interval is {interval}")
+    print(f"batch is {batch_size}")
     dynamic_inputs = []
-    for batch_size in dynamic_batch_sizes:
-        dynamic_inputs += ["--dynamic-batch-size", str(batch_size[0])]
-        dynamic_inputs += ["--dynamic-batch-time", str(batch_size[1])]
+    for interval in dynamic_intervals:
+        dynamic_inputs += ["--dynamic-interval", str(interval[0])]
+        dynamic_inputs += ["--dynamic-interval-time", str(interval[1])]
 
 
     print(f"cleaning up previous run")
-    runClients(dummy_interval, dummy_batch_size, dummy=True)
+    runClients(dummy_batch_size, dummy_interval, dummy=True)
     time.sleep(10)
     print(f"starting {number_of_clients} benchmark clients for batch size {batch_size}, interval: {interval}")
-    runClients(interval, dynamic_inputs)
+    runClients(batch_size, dynamic_inputs)
     
     subprocess.Popen(["scp", "-r", f'cc@{client_address}:~/paxos/result', "."]).wait
 
-def runClients(interval, batch_size, dummy=False):
+def runClients(batch_size, interval, dummy=False):
     clients = []
     for i in range(number_of_clients):
         result_file = f'~/paxos/result/result_partition{i + 1}.csv' if not dummy else f'/tmp/result_dummy{i + 1}.csv'
@@ -128,16 +130,18 @@ def runClients(interval, batch_size, dummy=False):
                         "--throughput", "-1",
                         "--record-size", "255",
                         "--partition-id", str(i + 1),
-                        "--interval", str(interval),
+                        "--batch-size", str(batch_size),
                         "--timeout", str(timeout), 
                         "--result-file", result_file,
                         "--metric-file", f'~/paxos/result/metrics_partition{i + 1}.csv',
+                        "--exponential-load", "true",
                         "--max-retry", str(max_retry)
+
                     ]
         if dummy:
-            process += ["--batch-size", str(batch_size)]
+            process += ["--interval", str(interval)]
         else: 
-            process += batch_size
+            process += interval
 
         client = subprocess.Popen(process)
         clients.append(client)

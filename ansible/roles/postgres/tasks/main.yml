@@ -24,6 +24,7 @@
 - name: Prune volumes
   community.docker.docker_prune:
     volumes: true
+  become: true
 
 - name: Create and start services
   community.docker.docker_compose:

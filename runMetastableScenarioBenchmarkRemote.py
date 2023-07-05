@@ -7,21 +7,21 @@ import signal
 servers = [
     {
         "address":"129.114.108.105",
-        "ip":"10.52.2.90",
+        "ip":"10.52.3.1",
         "port": "8001",
         "postgres": "9000",
         "partition": "3"
     },
     {
         "address":"129.114.109.112",
-        "ip":"10.52.2.124",
+        "ip":"10.52.3.221",
         "port": "8002",
         "postgres": "9000",
         "partition": "2"
     },
     {
         "address":"129.114.109.1", 
-        "ip":"10.52.3.62",
+        "ip":"10.52.3.147",
         "port": "8003",
         "postgres": "9000",
         "partition": "1"
